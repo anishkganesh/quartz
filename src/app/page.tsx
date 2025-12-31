@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import ThemeToggle from "@/components/ThemeToggle";
-import AuthButton from "@/components/AuthButton";
 
 export default function Home() {
   // Initialize theme on mount
@@ -18,9 +17,8 @@ export default function Home() {
 
   return (
     <div className="home-container">
-      {/* Top right corner - auth and theme toggle */}
-      <div className="fixed top-4 right-4 flex items-center gap-2">
-        <AuthButton />
+      {/* Theme toggle in corner */}
+      <div className="fixed top-4 right-4">
         <ThemeToggle />
       </div>
 

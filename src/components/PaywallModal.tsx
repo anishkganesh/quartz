@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { User, Session, AuthChangeEvent } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase";
+import { LIMITS } from "@/lib/client-usage";
 
 interface PaywallModalProps {
   isOpen: boolean;
@@ -17,27 +19,43 @@ export default function PaywallModal({
   limit,
 }: PaywallModalProps) {
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const supabase = getSupabaseClient();
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
+
   if (!isOpen) return null;
+
+  const isAnonymous = !user;
+
+  const handleSignIn = async () => {
+    setLoading(true);
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${window.location.pathname}`,
+      },
+    });
+  };
 
   const handleSubscribe = async () => {
     setLoading(true);
 
     try {
-      // Check if user is logged in
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
       if (!user) {
-        // Redirect to sign in first
-        await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo: `${window.location.origin}/auth/callback?next=${window.location.pathname}`,
-          },
-        });
+        await handleSignIn();
         return;
       }
 
@@ -69,26 +87,50 @@ export default function PaywallModal({
   return (
     <div className="paywall-overlay" onClick={onClose}>
       <div className="paywall-modal" onClick={(e) => e.stopPropagation()}>
-        <h2 className="paywall-title">Upgrade to Unlimited</h2>
+        <h2 className="paywall-title">
+          {isAnonymous ? "Sign in to continue" : "Upgrade to Unlimited"}
+        </h2>
+        
         <p className="paywall-description">
-          You&apos;ve used all your free articles for today. Upgrade to get unlimited
-          access to AI-generated articles, audio, quizzes, and more.
+          {isAnonymous 
+            ? `You've used your ${LIMITS.anonymous} free articles. Sign in for ${LIMITS.loggedIn} free articles per day, or subscribe for unlimited access.`
+            : "You've reached your daily limit. Subscribe for unlimited access to all features."
+          }
         </p>
 
         <p className="paywall-usage">
-          {currentUsage} / {limit} free articles used today
+          {currentUsage} / {limit} articles today
         </p>
 
-        <div className="paywall-price">$20</div>
-        <p className="paywall-price-detail">per month · Cancel anytime</p>
-
-        <button
-          className="paywall-btn"
-          onClick={handleSubscribe}
-          disabled={loading}
-        >
-          {loading ? "Loading..." : "Get Unlimited Access"}
-        </button>
+        {isAnonymous ? (
+          <>
+            <button
+              className="paywall-btn"
+              onClick={handleSignIn}
+              disabled={loading}
+            >
+              {loading ? "..." : "Sign in with Google"}
+            </button>
+            <p className="paywall-or">or</p>
+            <button
+              className="paywall-btn-secondary"
+              onClick={handleSubscribe}
+              disabled={loading}
+            >
+              Subscribe · $20/mo
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              className="paywall-btn"
+              onClick={handleSubscribe}
+              disabled={loading}
+            >
+              {loading ? "..." : "Subscribe · $20/mo"}
+            </button>
+          </>
+        )}
 
         <button className="paywall-close" onClick={onClose}>
           Maybe later

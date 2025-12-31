@@ -1466,6 +1466,87 @@ button {
   font-weight: 500;
 }
 
+/* Header Auth Button (Grokipedia-style) */
+.header-auth-btn {
+  padding: 0.5rem 1rem;
+  background: var(--foreground);
+  color: var(--background);
+  border: none;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.header-auth-btn:hover {
+  opacity: 0.9;
+}
+
+.header-auth-btn.logged-in {
+  padding: 0.25rem;
+  background: transparent;
+}
+
+.header-auth-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.header-auth-avatar-placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--foreground);
+  color: var(--background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.header-auth-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  z-index: 50;
+  overflow: hidden;
+}
+
+.header-auth-menu-email {
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  color: var(--foreground-muted);
+  border-bottom: 1px solid var(--border);
+  word-break: break-all;
+}
+
+.header-auth-menu-item {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.header-auth-menu-item:hover {
+  background: var(--background-tertiary);
+}
+
 /* ============================================
    PAYWALL MODAL STYLES
    ============================================ */
@@ -1473,7 +1554,7 @@ button {
 .paywall-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -1483,53 +1564,45 @@ button {
 
 .paywall-modal {
   background: var(--background);
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   padding: 2rem;
-  max-width: 400px;
+  max-width: 360px;
   width: 90%;
   text-align: center;
 }
 
 .paywall-title {
   font-family: var(--font-serif);
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 500;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
   color: var(--foreground);
 }
 
 .paywall-description {
   color: var(--foreground-muted);
-  font-size: 0.9375rem;
-  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
   line-height: 1.5;
 }
 
-.paywall-price {
-  font-size: 2rem;
-  font-weight: 600;
-  color: var(--foreground);
-  margin-bottom: 0.25rem;
-}
-
-.paywall-price-detail {
-  color: var(--foreground-muted);
-  font-size: 0.875rem;
+.paywall-usage {
+  color: var(--foreground-subtle);
+  font-size: 0.8125rem;
   margin-bottom: 1.5rem;
 }
 
 .paywall-btn {
   width: 100%;
-  padding: 0.875rem 1.5rem;
+  padding: 0.75rem 1.25rem;
   background: var(--foreground);
   color: var(--background);
   border: none;
   border-radius: 9999px;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
-  margin-bottom: 0.75rem;
+  transition: opacity 0.15s ease;
 }
 
 .paywall-btn:hover {
@@ -1541,13 +1614,37 @@ button {
   cursor: not-allowed;
 }
 
+.paywall-or {
+  color: var(--foreground-subtle);
+  font-size: 0.8125rem;
+  margin: 0.75rem 0;
+}
+
+.paywall-btn-secondary {
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.paywall-btn-secondary:hover {
+  background: var(--background-tertiary);
+}
+
 .paywall-close {
   background: transparent;
   border: none;
   color: var(--foreground-muted);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   cursor: pointer;
-  padding: 0.5rem;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
 }
 
 .paywall-close:hover {

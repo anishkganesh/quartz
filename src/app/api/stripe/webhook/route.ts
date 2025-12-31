@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 
-// Use service role client for webhooks (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-initialize Supabase admin client (for webhooks, bypasses RLS)
+let supabaseAdmin: SupabaseClient | null = null;
+
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return supabaseAdmin;
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -45,9 +52,11 @@ export async function POST(request: NextRequest) {
 
         if (userId && subscriptionId) {
           // Get subscription details
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as {
+            current_period_end: number;
+          };
 
-          await supabaseAdmin.from("quartz_subscriptions").upsert({
+          await getSupabaseAdmin().from("quartz_subscriptions").upsert({
             user_id: userId,
             stripe_customer_id: session.customer as string,
             stripe_subscription_id: subscriptionId,
@@ -62,18 +71,22 @@ export async function POST(request: NextRequest) {
       }
 
       case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const customerId = subscription.customer as string;
+        const subscription = event.data.object as unknown as {
+          customer: string;
+          status: string;
+          current_period_end: number;
+        };
+        const customerId = subscription.customer;
 
         // Find user by customer ID
-        const { data: existingSubscription } = await supabaseAdmin
+        const { data: existingSubscription } = await getSupabaseAdmin()
           .from("quartz_subscriptions")
           .select("user_id")
           .eq("stripe_customer_id", customerId)
           .single();
 
         if (existingSubscription) {
-          await supabaseAdmin.from("quartz_subscriptions").update({
+          await getSupabaseAdmin().from("quartz_subscriptions").update({
             status: subscription.status === "active" ? "active" : subscription.status,
             current_period_end: new Date(
               subscription.current_period_end * 1000
@@ -85,18 +98,18 @@ export async function POST(request: NextRequest) {
       }
 
       case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const customerId = subscription.customer as string;
+        const subscription = event.data.object as unknown as { customer: string };
+        const customerId = subscription.customer;
 
         // Find user by customer ID
-        const { data: existingSubscription } = await supabaseAdmin
+        const { data: existingSubscription } = await getSupabaseAdmin()
           .from("quartz_subscriptions")
           .select("user_id")
           .eq("stripe_customer_id", customerId)
           .single();
 
         if (existingSubscription) {
-          await supabaseAdmin.from("quartz_subscriptions").update({
+          await getSupabaseAdmin().from("quartz_subscriptions").update({
             status: "canceled",
             updated_at: new Date().toISOString(),
           }).eq("user_id", existingSubscription.user_id);
@@ -105,18 +118,18 @@ export async function POST(request: NextRequest) {
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice;
-        const customerId = invoice.customer as string;
+        const invoice = event.data.object as unknown as { customer: string };
+        const customerId = invoice.customer;
 
         // Find user by customer ID
-        const { data: existingSubscription } = await supabaseAdmin
+        const { data: existingSubscription } = await getSupabaseAdmin()
           .from("quartz_subscriptions")
           .select("user_id")
           .eq("stripe_customer_id", customerId)
           .single();
 
         if (existingSubscription) {
-          await supabaseAdmin.from("quartz_subscriptions").update({
+          await getSupabaseAdmin().from("quartz_subscriptions").update({
             status: "past_due",
             updated_at: new Date().toISOString(),
           }).eq("user_id", existingSubscription.user_id);

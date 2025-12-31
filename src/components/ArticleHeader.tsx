@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Home, Search, Loader2 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import HeaderAuthButton from "./HeaderAuthButton";
 import SearchModal from "./SearchModal";
 import Breadcrumbs, { BreadcrumbItem } from "./Breadcrumbs";
 import { getRecentTopics } from "@/lib/cache";
@@ -204,6 +205,7 @@ export default function ArticleHeader({
           </div>
           
           <ThemeToggle />
+          <HeaderAuthButton />
         </div>
       </header>
 

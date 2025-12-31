@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { X } from "lucide-react";
 import ArticleHeader from "@/components/ArticleHeader";
@@ -16,9 +16,12 @@ import QuizPanel, { Question } from "@/components/QuizPanel";
 import ChatPanel from "@/components/ChatPanel";
 import TextSelectionPopup from "@/components/TextSelectionPopup";
 import RelatedQuestions from "@/components/RelatedQuestions";
+import PaywallModal from "@/components/PaywallModal";
 import { BreadcrumbItem } from "@/components/Breadcrumbs";
 import { getFromCache, saveToCache, addRecentTopic } from "@/lib/cache";
 import { toTitleCase } from "@/lib/utils";
+import { getSupabaseClient } from "@/lib/supabase";
+import { checkAnonLimit, incrementAnonUsage, LIMITS } from "@/lib/client-usage";
 
 interface PanelState {
   topic: string;
@@ -83,6 +86,12 @@ export default function WikiPage() {
   // Chat initial message
   const [chatInitialMessage, setChatInitialMessage] = useState<string>("");
 
+  // Paywall state
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [usageInfo, setUsageInfo] = useState<{ used: number; limit: number }>({ used: 0, limit: LIMITS.anonymous });
+  const supabase = getSupabaseClient();
+  const usageCheckedRef = useRef<Set<string>>(new Set());
+
   // Load content for root panel
   useEffect(() => {
     loadContent(rootTopic, 0);
@@ -101,7 +110,7 @@ export default function WikiPage() {
     setIsLoading(true);
     setError(null);
 
-    // Check cache
+    // Check cache first - cached content doesn't count against limit
     const cached = getFromCache(topic);
     if (cached) {
       setPanelStack((prev) => {
@@ -117,6 +126,23 @@ export default function WikiPage() {
       return;
     }
 
+    // Check usage limit before generating new content
+    if (!usageCheckedRef.current.has(topic)) {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        // Anonymous user - check localStorage
+        const anonLimit = checkAnonLimit();
+        if (!anonLimit.canGenerate) {
+          setUsageInfo({ used: LIMITS.anonymous, limit: LIMITS.anonymous });
+          setShowPaywall(true);
+          setIsLoading(false);
+          return;
+        }
+      }
+      // Note: Logged-in users are checked server-side in the API
+    }
+
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -124,10 +150,26 @@ export default function WikiPage() {
         body: JSON.stringify({ topic }),
       });
 
+      if (response.status === 429) {
+        // Rate limited - show paywall
+        const data = await response.json();
+        setUsageInfo({ used: data.currentUsage || LIMITS.loggedIn, limit: LIMITS.loggedIn });
+        setShowPaywall(true);
+        setIsLoading(false);
+        return;
+      }
+
       if (!response.ok) throw new Error("Failed to generate");
 
       const data = await response.json();
       saveToCache(topic, data.content);
+      usageCheckedRef.current.add(topic);
+
+      // Increment anonymous usage
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        incrementAnonUsage();
+      }
 
       setPanelStack((prev) => {
         const updated = [...prev];
@@ -509,6 +551,14 @@ export default function WikiPage() {
             onClose={() => setSelectionPopup(null)}
           />
         )}
+
+        {/* Paywall Modal */}
+        <PaywallModal
+          isOpen={showPaywall}
+          onClose={() => setShowPaywall(false)}
+          currentUsage={usageInfo.used}
+          limit={usageInfo.limit}
+        />
       </div>
     </div>
   );
