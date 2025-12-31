@@ -7,11 +7,13 @@ export default function PostAuthHandler() {
   useEffect(() => {
     const checkSubscribeIntent = async () => {
       const intent = localStorage.getItem("quartz_subscribe_intent");
-      console.log("[PostAuthHandler] Checking intent:", intent);
+      const returnUrl = localStorage.getItem("quartz_return_url");
+      console.log("[PostAuthHandler] Checking intent:", intent, "returnUrl:", returnUrl);
       if (!intent) return;
 
-      // Clear the intent immediately to prevent loops
+      // Clear the intent and return URL immediately to prevent loops
       localStorage.removeItem("quartz_subscribe_intent");
+      localStorage.removeItem("quartz_return_url");
 
       const supabase = getSupabaseClient();
       console.log("[PostAuthHandler] Supabase client:", !!supabase);
@@ -36,6 +38,7 @@ export default function PostAuthHandler() {
           body: JSON.stringify({
             userId: user.id,
             email: user.email,
+            returnUrl: returnUrl || "/",
           }),
         });
 

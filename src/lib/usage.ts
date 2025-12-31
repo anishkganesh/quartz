@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 
-const FREE_DAILY_LIMIT = 10;
+const FREE_DAILY_LIMIT = 3;
 
 interface UsageResult {
   canGenerate: boolean;

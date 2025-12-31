@@ -4,7 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase-server";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, email } = await request.json();
+    const { userId, email, returnUrl } = await request.json();
 
     if (!userId || !email) {
       return NextResponse.json(
@@ -60,6 +60,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Use returnUrl if provided, otherwise default to origin
+    const baseUrl = request.nextUrl.origin;
+    const successUrl = returnUrl ? `${baseUrl}${returnUrl}?success=true` : `${baseUrl}?success=true`;
+    const cancelUrl = returnUrl ? `${baseUrl}${returnUrl}?canceled=true` : `${baseUrl}?canceled=true`;
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -71,8 +76,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: "subscription",
-      success_url: `${request.nextUrl.origin}?success=true`,
-      cancel_url: `${request.nextUrl.origin}?canceled=true`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       metadata: {
         supabase_user_id: userId,
       },

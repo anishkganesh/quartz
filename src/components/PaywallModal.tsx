@@ -56,25 +56,27 @@ export default function PaywallModal({
 
     try {
       if (!user) {
-        // Store subscribe intent in localStorage before OAuth redirect
+        // Store subscribe intent and return URL in localStorage before OAuth redirect
         localStorage.setItem("quartz_subscribe_intent", "true");
+        localStorage.setItem("quartz_return_url", window.location.pathname);
         if (!supabase) return;
         await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
-            redirectTo: `${window.location.origin}/auth/callback?next=${window.location.pathname}`,
+            redirectTo: `${window.location.origin}/auth/callback`,
           },
         });
         return;
       }
 
-      // Create Stripe checkout session
+      // Create Stripe checkout session with return URL
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
           email: user.email,
+          returnUrl: window.location.pathname,
         }),
       });
 
@@ -103,7 +105,7 @@ export default function PaywallModal({
         
         <p className="paywall-description">
           {isAnonymous 
-            ? `You've used your ${LIMITS.anonymous} free articles. Sign in for ${LIMITS.loggedIn} free articles per day, or subscribe for unlimited access.`
+            ? `You've used your free article. Sign in for ${LIMITS.loggedIn} free articles per day, or subscribe for unlimited access.`
             : "You've reached your daily limit. Subscribe for unlimited access."
           }
         </p>

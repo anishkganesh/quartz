@@ -16,6 +16,15 @@ function getSupabaseAdmin() {
   return supabaseAdmin;
 }
 
+// Helper to safely get period end date
+function getPeriodEndDate(periodEnd: number | undefined | null): string {
+  if (periodEnd && typeof periodEnd === "number" && periodEnd > 0) {
+    return new Date(periodEnd * 1000).toISOString();
+  }
+  // Default to 30 days from now if invalid
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
@@ -50,33 +59,44 @@ export async function POST(request: NextRequest) {
         const userId = session.metadata?.supabase_user_id;
         const subscriptionId = session.subscription as string;
 
+        console.log("Checkout completed:", { userId, subscriptionId });
+
         if (userId && subscriptionId) {
           // Get subscription details
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId) as unknown as {
-            current_period_end: number;
-          };
-
-          await getSupabaseAdmin().from("quartz_subscriptions").upsert({
-            user_id: userId,
-            stripe_customer_id: session.customer as string,
-            stripe_subscription_id: subscriptionId,
-            status: "active",
-            current_period_end: new Date(
-              subscription.current_period_end * 1000
-            ).toISOString(),
-            updated_at: new Date().toISOString(),
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          console.log("Subscription retrieved:", {
+            id: subscription.id,
+            current_period_end: subscription.current_period_end,
           });
+
+          const periodEnd = getPeriodEndDate(subscription.current_period_end);
+
+          const { error: upsertError } = await getSupabaseAdmin()
+            .from("quartz_subscriptions")
+            .upsert(
+              {
+                user_id: userId,
+                stripe_customer_id: session.customer as string,
+                stripe_subscription_id: subscriptionId,
+                status: "active",
+                current_period_end: periodEnd,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "user_id" }
+            );
+
+          if (upsertError) {
+            console.error("Upsert error:", upsertError);
+            throw upsertError;
+          }
+          console.log("Subscription saved successfully");
         }
         break;
       }
 
       case "customer.subscription.updated": {
-        const subscription = event.data.object as unknown as {
-          customer: string;
-          status: string;
-          current_period_end: number;
-        };
-        const customerId = subscription.customer;
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
 
         // Find user by customer ID
         const { data: existingSubscription } = await getSupabaseAdmin()
@@ -86,11 +106,11 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (existingSubscription) {
+          const periodEnd = getPeriodEndDate(subscription.current_period_end);
+
           await getSupabaseAdmin().from("quartz_subscriptions").update({
             status: subscription.status === "active" ? "active" : subscription.status,
-            current_period_end: new Date(
-              subscription.current_period_end * 1000
-            ).toISOString(),
+            current_period_end: periodEnd,
             updated_at: new Date().toISOString(),
           }).eq("user_id", existingSubscription.user_id);
         }
@@ -98,8 +118,8 @@ export async function POST(request: NextRequest) {
       }
 
       case "customer.subscription.deleted": {
-        const subscription = event.data.object as unknown as { customer: string };
-        const customerId = subscription.customer;
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
 
         // Find user by customer ID
         const { data: existingSubscription } = await getSupabaseAdmin()
@@ -118,8 +138,8 @@ export async function POST(request: NextRequest) {
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object as unknown as { customer: string };
-        const customerId = invoice.customer;
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
 
         // Find user by customer ID
         const { data: existingSubscription } = await getSupabaseAdmin()

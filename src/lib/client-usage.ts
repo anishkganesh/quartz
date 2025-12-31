@@ -2,8 +2,8 @@
 // Uses localStorage to track daily article generation
 
 const STORAGE_KEY = "quartz_anon_usage";
-const ANON_DAILY_LIMIT = 3;
-const LOGGED_IN_DAILY_LIMIT = 10;
+const ANON_DAILY_LIMIT = 1;
+const LOGGED_IN_DAILY_LIMIT = 3;
 
 interface AnonUsage {
   date: string;
