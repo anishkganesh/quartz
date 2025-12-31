@@ -43,10 +43,12 @@ export default function PaywallModal({
   const handleSignIn = async () => {
     if (!supabase) return;
     setLoading(true);
+    // Store return URL in localStorage (query params get lost through OAuth)
+    localStorage.setItem("quartz_return_url", window.location.pathname);
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${window.location.pathname}`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
   };

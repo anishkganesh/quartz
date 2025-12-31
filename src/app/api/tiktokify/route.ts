@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     // Step 1: Generate a video prompt with GPT-4
     console.log("TikTokify: Generating video prompt...");
     const promptCompletion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-turbo",
       messages: [
         {
           role: "system",

@@ -5,31 +5,57 @@ import { getSupabaseClient } from "@/lib/supabase";
 
 export default function PostAuthHandler() {
   useEffect(() => {
-    const checkSubscribeIntent = async () => {
-      const intent = localStorage.getItem("quartz_subscribe_intent");
+    const handlePostAuth = async () => {
+      const subscribeIntent = localStorage.getItem("quartz_subscribe_intent");
       const returnUrl = localStorage.getItem("quartz_return_url");
-      console.log("[PostAuthHandler] Checking intent:", intent, "returnUrl:", returnUrl);
-      if (!intent) return;
+      console.log("[PostAuthHandler] intent:", subscribeIntent, "returnUrl:", returnUrl);
 
-      // Clear the intent and return URL immediately to prevent loops
+      // Clear localStorage immediately to prevent loops
       localStorage.removeItem("quartz_subscribe_intent");
       localStorage.removeItem("quartz_return_url");
 
+      // If no return URL stored, nothing to do
+      if (!returnUrl) return;
+
       const supabase = getSupabaseClient();
-      console.log("[PostAuthHandler] Supabase client:", !!supabase);
       if (!supabase) {
         console.error("[PostAuthHandler] No Supabase client");
         return;
       }
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      console.log("[PostAuthHandler] User:", user?.email, "Error:", userError);
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.error("[PostAuthHandler] No user found");
+        console.log("[PostAuthHandler] No user, skipping");
         return;
       }
 
-      // User just signed in with subscribe intent - redirect to Stripe
+      // Case 1: No subscribe intent - just redirect to return URL (sign-in only)
+      if (!subscribeIntent) {
+        console.log("[PostAuthHandler] Sign-in only, redirecting to:", returnUrl);
+        window.location.href = returnUrl;
+        return;
+      }
+
+      // Case 2: Subscribe intent - check if already subscribed
+      console.log("[PostAuthHandler] Checking subscription status for:", user.id);
+      const { data: subscription } = await supabase
+        .from("quartz_subscriptions")
+        .select("status, current_period_end")
+        .eq("user_id", user.id)
+        .single();
+
+      const isSubscribed = 
+        subscription?.status === "active" && 
+        new Date(subscription.current_period_end) > new Date();
+
+      if (isSubscribed) {
+        // Already subscribed - just redirect to article
+        console.log("[PostAuthHandler] Already subscribed, redirecting to:", returnUrl);
+        window.location.href = returnUrl;
+        return;
+      }
+
+      // Case 3: Not subscribed - create Stripe checkout
       console.log("[PostAuthHandler] Creating checkout for user:", user.id);
       try {
         const response = await fetch("/api/stripe/checkout", {
@@ -38,7 +64,7 @@ export default function PostAuthHandler() {
           body: JSON.stringify({
             userId: user.id,
             email: user.email,
-            returnUrl: returnUrl || "/",
+            returnUrl: returnUrl,
           }),
         });
 
@@ -46,17 +72,20 @@ export default function PostAuthHandler() {
         console.log("[PostAuthHandler] Checkout response:", data);
 
         if (data.url) {
-          console.log("[PostAuthHandler] Redirecting to:", data.url);
           window.location.href = data.url;
         } else {
           console.error("[PostAuthHandler] No URL in response:", data.error);
+          // Fallback to return URL on error
+          window.location.href = returnUrl;
         }
       } catch (error) {
         console.error("[PostAuthHandler] Error:", error);
+        // Fallback to return URL on error
+        window.location.href = returnUrl;
       }
     };
 
-    checkSubscribeIntent();
+    handlePostAuth();
   }, []);
 
   return null;

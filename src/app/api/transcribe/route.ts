@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Detect intent with GPT-4 - VERY CONSERVATIVE
     const intentCompletion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-turbo",
       messages: [
         {
           role: "system",
