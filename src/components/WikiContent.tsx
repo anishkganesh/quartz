@@ -23,11 +23,30 @@ function renderLatex(latex: string, displayMode: boolean = false): string {
   }
 }
 
+// Preprocess content to fix common formatting issues
+function preprocessContent(content: string): string {
+  // Convert [[math]] to $$math$$ when content looks like LaTeX
+  // (contains ^, _, \, {, }, or is a single letter/number formula)
+  return content.replace(/\[\[([^\]]+)\]\]/g, (match, inner) => {
+    // Check if this looks like math (has LaTeX characters) rather than a concept
+    const looksLikeMath = /[\\^_{}]|^\s*[a-zA-Z0-9\s+\-*\/=<>()]+\s*$/.test(inner) &&
+      (inner.includes('\\') || inner.includes('^') || inner.includes('_') || 
+       inner.includes('{') || /^[a-zA-Z]\s*=/.test(inner));
+    
+    if (looksLikeMath) {
+      return `$$${inner}$$`;
+    }
+    return match; // Keep as concept
+  });
+}
+
 function parseMarkdown(
   content: string,
   onConceptClick: (concept: string) => void
 ): React.ReactNode[] {
-  const lines = content.split("\n");
+  // Preprocess to fix LaTeX in [[]] brackets
+  const processedContent = preprocessContent(content);
+  const lines = processedContent.split("\n");
   const elements: React.ReactNode[] = [];
   let listItems: React.ReactNode[] = [];
   let listType: "ul" | "ol" | null = null;
@@ -70,7 +89,22 @@ function parseMarkdown(
       continue;
     }
 
-    // Headers
+    // Headers - check in order from most # to least
+    if (trimmedLine.startsWith("#### ")) {
+      flushList();
+      const text = trimmedLine.slice(5);
+      const id = text
+        .toLowerCase()
+        .replace(/\[\[|\]\]/g, "")
+        .replace(/[^a-z0-9]+/g, "-");
+      elements.push(
+        <h4 key={`h4-${i}`} id={id} className="scroll-mt-20">
+          {renderInlineContent(text, onConceptClick, `h4-${i}`)}
+        </h4>
+      );
+      continue;
+    }
+
     if (trimmedLine.startsWith("### ")) {
       flushList();
       const text = trimmedLine.slice(4);

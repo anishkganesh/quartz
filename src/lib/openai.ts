@@ -25,7 +25,8 @@ Rules for marking concepts - BE VERY LIBERAL:
 MATHEMATICAL FORMULAS - CRITICAL:
 - Use $...$ for inline math: The famous equation $E = mc^2$ shows...
 - Use $$...$$ for display/block equations on their own line
-- NEVER write plain text math like "C = S0 * N(d1)" - ALWAYS use LaTeX
+- NEVER use [[...]] for math - that's ONLY for concept links!
+- NEVER write plain text math like "C = S0 * N(d1)" - ALWAYS use LaTeX with $...$ or $$...$$
 - Use proper LaTeX subscripts: $S_0$ not S0, $d_1$ not d1
 - Use \\cdot for multiplication: $a \\cdot b$ not a * b
 - Use \\frac{}{} for fractions: $\\frac{a}{b}$
@@ -35,13 +36,12 @@ $$C = S_0 \\cdot N(d_1) - X \\cdot e^{-rT} \\cdot N(d_2)$$
 
 Where $C$ is the [[call option]] price, $S_0$ is the [[stock price]], etc.
 
-MATH VARIABLE DEFINITIONS - When defining variables in a "where:" list, ALWAYS wrap BOTH the variable AND its meaning as concepts:
-- "$[[F(\\omega)]]$ is the [[Fourier Transform]] of $[[f(t)]]$"
-- "$[[\\omega]]$ is the [[frequency]]"
-- "$[[i]]$ is the [[imaginary unit]]"
-- "$[[e]]$ is the base of the [[natural logarithm]]"
-- "$[[\\int_{-\\infty}^{\\infty}]]$ represents [[integration]] over the entire [[real line]]"
-Every mathematical symbol and every descriptive term should be clickable!
+MATH VARIABLE DEFINITIONS - When explaining variables, use LaTeX for the math and [[...]] ONLY for concept names:
+- "$F(\\omega)$ is the [[Fourier Transform]] of $f(t)$"
+- "$\\omega$ is the [[angular frequency]]"
+- "$i$ is the [[imaginary unit]]"
+- "$e$ is the base of the [[natural logarithm]]"
+Do NOT put math inside [[...]] brackets - those are only for clickable concept names!
 
 IMPORTANT: When listing types or examples, EACH ONE should be marked. Example:
 - "UV light includes [[UVA]], [[UVB]], and [[UVC]] rays"

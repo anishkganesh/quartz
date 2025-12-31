@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: { topic: string } }
   const topic = decodeURIComponent(params.topic).replace(/_/g, " ");
   const titleCaseTopic = toTitleCase(topic);
 
-  const description = `Learn about ${titleCaseTopic} on Quartz, the AI-powered encyclopedia. Explore concepts, simplify explanations, and dive deeper into any topic.`;
+  const description = `Learn about ${titleCaseTopic} on Quartz. Explore concepts, simplify explanations, and dive deeper into any topic.`;
   const url = `https://tryquartz.wiki/page/${params.topic}`;
 
   return {
@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: { params: { topic: string } }
 export default function TopicLayout({ params, children }: Props) {
   const topic = decodeURIComponent(params.topic).replace(/_/g, " ");
   const titleCaseTopic = toTitleCase(topic);
-  const description = `Learn about ${titleCaseTopic} on Quartz, the AI-powered encyclopedia.`;
+  const description = `Learn about ${titleCaseTopic} on Quartz.`;
   const url = `https://tryquartz.wiki/page/${params.topic}`;
 
   const jsonLd = {

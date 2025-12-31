@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     // Generate a video prompt with GPT-4
     console.log("Videofy: Generating video prompt...");
     const promptCompletion = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "gpt-5.2",
       messages: [
         {
           role: "system",

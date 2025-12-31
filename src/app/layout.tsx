@@ -18,9 +18,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Quartz - AI-Powered Encyclopedia",
+  title: "Quartz",
   description: "Learn anything with AI-generated articles. Click any concept to explore deeper. Simplify explanations, listen to audio, take quizzes, and more.",
-  keywords: ["AI encyclopedia", "learn", "education", "AI articles", "interactive learning", "knowledge"],
+  keywords: ["encyclopedia", "learn", "education", "articles", "interactive learning", "knowledge"],
   authors: [{ name: "Quartz" }],
   creator: "Quartz",
   publisher: "Quartz",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL("https://tryquartz.wiki"),
   openGraph: {
-    title: "Quartz - AI-Powered Encyclopedia",
+    title: "Quartz",
     description: "Learn anything with AI-generated articles. Click any concept to explore deeper.",
     url: "https://tryquartz.wiki",
     siteName: "Quartz",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Quartz - AI-Powered Encyclopedia",
+    title: "Quartz",
     description: "Learn anything with AI-generated articles. Click any concept to explore deeper.",
   },
   robots: {

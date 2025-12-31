@@ -29,7 +29,7 @@ ${articleContent?.slice(0, 8000) || "No article content provided."}
 Answer questions based on this article and your general knowledge.`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "gpt-5.2",
       messages: [
         { role: "system", content: systemMessage },
         ...messages.map((msg: ChatMessage) => ({
