@@ -86,32 +86,33 @@ export default function HeaderAuthButton() {
           <span className="avatar-initial">{getUserInitial()}</span>
         </button>
         
+        {/* Backdrop - only when menu is open */}
         {showMenu && (
-          <>
-            <div 
-              className="fixed inset-0 z-40" 
-              onClick={() => setShowMenu(false)}
-            />
-            <div className="avatar-dropdown">
-              <div className="avatar-dropdown-row">
-                <div className="avatar-dropdown-avatar">
-                  <span>{getUserInitial()}</span>
-                </div>
-                <div className="avatar-dropdown-info">
-                  <span className="avatar-dropdown-name">{getUserName()}</span>
-                  <span className="avatar-dropdown-email">{user.email}</span>
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="avatar-dropdown-logout"
-                  aria-label="Sign out"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setShowMenu(false)}
+          />
         )}
+        
+        {/* Dropdown - always rendered, visibility controlled by CSS class */}
+        <div className={`avatar-dropdown ${showMenu ? "show" : ""}`}>
+          <div className="avatar-dropdown-row">
+            <div className="avatar-dropdown-avatar">
+              <span>{getUserInitial()}</span>
+            </div>
+            <div className="avatar-dropdown-info">
+              <span className="avatar-dropdown-name">{getUserName()}</span>
+              <span className="avatar-dropdown-email">{user.email}</span>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="avatar-dropdown-logout"
+              aria-label="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
