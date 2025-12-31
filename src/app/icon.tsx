@@ -19,7 +19,7 @@ export default function Icon() {
           alignItems: "center",
           justifyContent: "center",
           fontFamily: "Georgia, Times New Roman, serif",
-          fontWeight: 600,
+          fontWeight: 700,
           color: "#1a1a1a",
         }}
       >
