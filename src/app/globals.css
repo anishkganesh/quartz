@@ -189,7 +189,6 @@ p {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: opacity 0.2s ease;
 }
 
 .search-submit-btn:hover {
