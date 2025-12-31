@@ -1421,3 +1421,141 @@ button {
 [data-theme="dark"] .katex .mclose {
   color: var(--foreground);
 }
+
+/* ============================================
+   AUTH BUTTON STYLES
+   ============================================ */
+
+.auth-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background: var(--background-tertiary);
+  border: none;
+  border-radius: 9999px;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.auth-btn:hover {
+  background: var(--background-secondary);
+  box-shadow: var(--shadow-hover);
+}
+
+.auth-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auth-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.auth-google-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.auth-btn-text {
+  font-weight: 500;
+}
+
+/* ============================================
+   PAYWALL MODAL STYLES
+   ============================================ */
+
+.paywall-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.paywall-modal {
+  background: var(--background);
+  border-radius: 1rem;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+}
+
+.paywall-title {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--foreground);
+}
+
+.paywall-description {
+  color: var(--foreground-muted);
+  font-size: 0.9375rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.paywall-price {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 0.25rem;
+}
+
+.paywall-price-detail {
+  color: var(--foreground-muted);
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.paywall-btn {
+  width: 100%;
+  padding: 0.875rem 1.5rem;
+  background: var(--foreground);
+  color: var(--background);
+  border: none;
+  border-radius: 9999px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 0.75rem;
+}
+
+.paywall-btn:hover {
+  opacity: 0.9;
+}
+
+.paywall-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.paywall-close {
+  background: transparent;
+  border: none;
+  color: var(--foreground-muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+.paywall-close:hover {
+  color: var(--foreground);
+}
+
+.paywall-usage {
+  color: var(--foreground-subtle);
+  font-size: 0.8125rem;
+  margin-bottom: 1rem;
+}

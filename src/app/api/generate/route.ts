@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { openai, WIKI_SYSTEM_PROMPT } from "@/lib/openai";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { checkUsage, incrementUsage } from "@/lib/usage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,6 +12,29 @@ export async function POST(request: NextRequest) {
         { error: "Topic is required" },
         { status: 400 }
       );
+    }
+
+    // Check authentication and usage
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // If user is logged in, check usage limits
+    if (user) {
+      const usage = await checkUsage(supabase, user.id);
+
+      if (!usage.canGenerate) {
+        return NextResponse.json(
+          {
+            error: "usage_limit",
+            message: "Daily limit reached",
+            currentCount: usage.currentCount,
+            limit: usage.limit,
+          },
+          { status: 429 }
+        );
+      }
     }
 
     // Clean up the topic name
@@ -56,6 +81,11 @@ Example: If writing about UV light, mark [[UVA]], [[UVB]], [[UVC]], [[sunscreen]
         { error: "Failed to generate content" },
         { status: 500 }
       );
+    }
+
+    // Increment usage for logged-in users
+    if (user) {
+      await incrementUsage(supabase, user.id);
     }
 
     return NextResponse.json({ content, topic: cleanTopic });
