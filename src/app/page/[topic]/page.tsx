@@ -128,7 +128,11 @@ export default function WikiPage() {
 
     // Check usage limit before generating new content
     if (!usageCheckedRef.current.has(topic)) {
-      const { data: { user } } = await supabase.auth.getUser();
+      let user = null;
+      if (supabase) {
+        const { data } = await supabase.auth.getUser();
+        user = data.user;
+      }
       
       if (!user) {
         // Anonymous user - check localStorage
@@ -166,8 +170,12 @@ export default function WikiPage() {
       usageCheckedRef.current.add(topic);
 
       // Increment anonymous usage
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      let currentUser = null;
+      if (supabase) {
+        const { data } = await supabase.auth.getUser();
+        currentUser = data.user;
+      }
+      if (!currentUser) {
         incrementAnonUsage();
       }
 

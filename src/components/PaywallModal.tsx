@@ -23,6 +23,8 @@ export default function PaywallModal({
   const supabase = getSupabaseClient();
 
   useEffect(() => {
+    if (!supabase) return;
+
     supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setUser(session?.user ?? null);
     });
@@ -34,13 +36,14 @@ export default function PaywallModal({
     );
 
     return () => subscription.unsubscribe();
-  }, [supabase.auth]);
+  }, [supabase]);
 
   if (!isOpen) return null;
 
   const isAnonymous = !user;
 
   const handleSignIn = async () => {
+    if (!supabase) return;
     setLoading(true);
     await supabase.auth.signInWithOAuth({
       provider: "google",

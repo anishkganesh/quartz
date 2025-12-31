@@ -12,6 +12,11 @@ export default function HeaderAuthButton() {
   const supabase = getSupabaseClient();
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setUser(session?.user ?? null);
@@ -26,9 +31,10 @@ export default function HeaderAuthButton() {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase.auth]);
+  }, [supabase]);
 
   const handleSignIn = async () => {
+    if (!supabase) return;
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -38,6 +44,7 @@ export default function HeaderAuthButton() {
   };
 
   const handleSignOut = async () => {
+    if (!supabase) return;
     await supabase.auth.signOut();
     setShowMenu(false);
   };
