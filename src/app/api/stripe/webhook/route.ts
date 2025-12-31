@@ -99,8 +99,13 @@ export async function POST(request: NextRequest) {
       }
 
       case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const customerId = subscription.customer as string;
+        // Cast to access current_period_end
+        const subscription = event.data.object as unknown as {
+          customer: string;
+          status: string;
+          current_period_end: number;
+        };
+        const customerId = subscription.customer;
 
         // Find user by customer ID
         const { data: existingSubscription } = await getSupabaseAdmin()
@@ -122,8 +127,8 @@ export async function POST(request: NextRequest) {
       }
 
       case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription;
-        const customerId = subscription.customer as string;
+        const subscription = event.data.object as unknown as { customer: string };
+        const customerId = subscription.customer;
 
         // Find user by customer ID
         const { data: existingSubscription } = await getSupabaseAdmin()
@@ -142,8 +147,8 @@ export async function POST(request: NextRequest) {
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice;
-        const customerId = invoice.customer as string;
+        const invoice = event.data.object as unknown as { customer: string };
+        const customerId = invoice.customer;
 
         // Find user by customer ID
         const { data: existingSubscription } = await getSupabaseAdmin()
