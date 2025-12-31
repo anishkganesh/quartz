@@ -133,7 +133,7 @@ p {
   width: 100%;
   max-width: 680px;
   /* Offset so search box (not title+search) is at true center */
-  padding-bottom: 4.5rem;
+  padding-bottom: 6rem;
 }
 
 .home-logo {
