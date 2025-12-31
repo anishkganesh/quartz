@@ -9,9 +9,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ suggestions: [] });
     }
 
-    const completion = await openai.chat.completions.create({
+    const completion = await openai.responses.create({
       model: "gpt-5.2",
-      messages: [
+      input: [
         {
           role: "system",
           content: `You are a knowledge graph assistant. Given a search query, generate 8 related concept suggestions that form a concept mindmap. Include:
@@ -30,11 +30,12 @@ Return ONLY a JSON array of 8 concept names as strings, ordered by relevance. Ke
 Generate 8 related concepts.`,
         },
       ],
+      reasoning: { effort: "none" },
       temperature: 0.7,
-      max_tokens: 300,
+      max_output_tokens: 300,
     });
 
-    const responseText = completion.choices[0]?.message?.content || "[]";
+    const responseText = completion.output_text || "[]";
     
     // Parse JSON response
     let suggestions: string[] = [];

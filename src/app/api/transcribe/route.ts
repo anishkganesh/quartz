@@ -29,10 +29,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Detect intent with GPT-4 - VERY CONSERVATIVE
-    const intentCompletion = await openai.chat.completions.create({
+    // Step 2: Detect intent with GPT-5.2 - VERY CONSERVATIVE
+    const intentResponse = await openai.responses.create({
       model: "gpt-5.2",
-      messages: [
+      input: [
         {
           role: "system",
           content: `You analyze speech transcriptions. Be EXTREMELY CONSERVATIVE - default to "ignore" unless there is a CLEAR, EXPLICIT request.
@@ -93,11 +93,12 @@ Examples of TOPIC (explicit navigation/expansion):
           content: text,
         },
       ],
+      reasoning: { effort: "none" },
       temperature: 0.1,
-      max_tokens: 150,
+      max_output_tokens: 150,
     });
 
-    const intentText = intentCompletion.choices[0]?.message?.content || "";
+    const intentText = intentResponse.output_text || "";
     
     // Parse the intent response - DEFAULT TO IGNORE
     let result = { type: "ignore" as "question" | "topic" | "ignore", content: "" };

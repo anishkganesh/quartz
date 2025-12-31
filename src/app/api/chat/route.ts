@@ -28,20 +28,21 @@ ${articleContent?.slice(0, 8000) || "No article content provided."}
 
 Answer questions based on this article and your general knowledge.`;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await openai.responses.create({
       model: "gpt-5.2",
-      messages: [
+      input: [
         { role: "system", content: systemMessage },
         ...messages.map((msg: ChatMessage) => ({
           role: msg.role,
           content: msg.content,
         })),
       ],
+      reasoning: { effort: "none" },
       temperature: 0.7,
-      max_tokens: 1000,
+      max_output_tokens: 1000,
     });
 
-    const response = completion.choices[0]?.message?.content || "I couldn't generate a response.";
+    const response = completion.output_text || "I couldn't generate a response.";
 
     return NextResponse.json({ response });
   } catch (error) {

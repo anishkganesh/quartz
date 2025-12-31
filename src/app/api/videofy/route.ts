@@ -12,11 +12,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate a video prompt with GPT-4
+    // Generate a video prompt with GPT-5.2
     console.log("Videofy: Generating video prompt...");
-    const promptCompletion = await openai.chat.completions.create({
+    const promptResponse = await openai.responses.create({
       model: "gpt-5.2",
-      messages: [
+      input: [
         {
           role: "system",
           content: `You are an expert at creating prompts for AI video generation. Create a detailed, visual prompt for a YouTube-style educational explainer video.
@@ -39,11 +39,12 @@ ${content?.slice(0, 1500) || "Generate from the topic name"}
 The video should be horizontal (landscape 16:9), 8 seconds, visually educational.`,
         },
       ],
+      reasoning: { effort: "none" },
       temperature: 0.85,
-      max_tokens: 300,
+      max_output_tokens: 300,
     });
 
-    const videoPrompt = promptCompletion.choices[0]?.message?.content;
+    const videoPrompt = promptResponse.output_text;
 
     if (!videoPrompt) {
       return NextResponse.json(

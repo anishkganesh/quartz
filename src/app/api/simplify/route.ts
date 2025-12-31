@@ -28,9 +28,9 @@ export async function POST(request: NextRequest) {
 
     const levelPrompt = LEVEL_PROMPTS[targetLevel] || LEVEL_PROMPTS["Elementary"];
 
-    const completion = await openai.chat.completions.create({
+    const response = await openai.responses.create({
       model: "gpt-5.2",
-      messages: [
+      input: [
         {
           role: "system",
           content: levelPrompt,
@@ -40,11 +40,12 @@ export async function POST(request: NextRequest) {
           content: `Simplify this article about "${topic || "this topic"}":\n\n${content}`,
         },
       ],
+      reasoning: { effort: "none" },
       temperature: 0.8,
-      max_tokens: 2500,
+      max_output_tokens: 2500,
     });
 
-    const simplifiedContent = completion.choices[0]?.message?.content;
+    const simplifiedContent = response.output_text;
 
     if (!simplifiedContent) {
       return NextResponse.json(

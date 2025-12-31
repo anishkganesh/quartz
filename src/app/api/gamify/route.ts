@@ -12,9 +12,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const completion = await openai.chat.completions.create({
+    const apiResponse = await openai.responses.create({
       model: "gpt-5.2",
-      messages: [
+      input: [
         {
           role: "system",
           content: `You are a quiz generator. Create a multiple-choice quiz to test understanding of the topic.
@@ -45,11 +45,12 @@ Make sure correctIndex is 0-3 (the index of the correct option in the options ar
           content: `Create a quiz about "${topic}". Use this content as reference:\n\n${content?.slice(0, 2000) || "Generate from the topic name"}`,
         },
       ],
+      reasoning: { effort: "none" },
       temperature: 0.7,
-      max_tokens: 2000,
+      max_output_tokens: 2000,
     });
 
-    const response = completion.choices[0]?.message?.content;
+    const response = apiResponse.output_text;
 
     if (!response) {
       return NextResponse.json(

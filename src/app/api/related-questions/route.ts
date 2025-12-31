@@ -12,9 +12,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const completion = await openai.chat.completions.create({
+    const apiResponse = await openai.responses.create({
       model: "gpt-5.2",
-      messages: [
+      input: [
         {
           role: "system",
           content: `You are an expert educator. Generate exactly 5 thought-provoking questions about the given topic that would help someone deepen their understanding. The questions should:
@@ -36,11 +36,12 @@ ${content?.slice(0, 2000) || "Generate questions based on the topic name"}
 Generate 5 related questions.`,
         },
       ],
+      reasoning: { effort: "none" },
       temperature: 0.8,
-      max_tokens: 500,
+      max_output_tokens: 500,
     });
 
-    const responseText = completion.choices[0]?.message?.content || "[]";
+    const responseText = apiResponse.output_text || "[]";
     
     // Parse JSON response
     let questions: string[] = [];

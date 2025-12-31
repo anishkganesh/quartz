@@ -40,9 +40,9 @@ export async function POST(request: NextRequest) {
     // Clean up the topic name
     const cleanTopic = topic.replace(/_/g, " ").trim();
 
-    const completion = await openai.chat.completions.create({
+    const response = await openai.responses.create({
       model: "gpt-5.2",
-      messages: [
+      input: [
         {
           role: "system",
           content: WIKI_SYSTEM_PROMPT,
@@ -70,11 +70,12 @@ CONCEPT MARKING - Mark ALL of these:
 Example: If writing about UV light, mark [[UVA]], [[UVB]], [[UVC]], [[sunscreen]], [[skin cancer]], [[ozone layer]], etc. - each as a separate clickable concept.`,
         },
       ],
+      reasoning: { effort: "none" },
       temperature: 0.7,
-      max_tokens: 2500,
+      max_output_tokens: 2500,
     });
 
-    const content = completion.choices[0]?.message?.content;
+    const content = response.output_text;
 
     if (!content) {
       return NextResponse.json(
