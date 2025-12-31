@@ -22,13 +22,14 @@ export default function Home() {
         <ThemeToggle />
       </div>
 
-      {/* Main content */}
-      <h1 className="home-logo">Quartz</h1>
-
-      <SearchAutocomplete
-        autoFocus
-        placeholder=""
-      />
+      {/* Main content - search box at vertical center */}
+      <div className="home-content">
+        <h1 className="home-logo">Quartz</h1>
+        <SearchAutocomplete
+          autoFocus
+          placeholder=""
+        />
+      </div>
     </div>
   );
 }

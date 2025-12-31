@@ -120,11 +120,20 @@ p {
 .home-container {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 2rem;
   position: relative;
+}
+
+.home-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 680px;
+  /* Offset so search box (not title+search) is at true center */
+  padding-bottom: 4.5rem;
 }
 
 .home-logo {
@@ -133,7 +142,6 @@ p {
   font-weight: 400;
   color: var(--foreground);
   margin-bottom: 1.5rem;
-  margin-top: 0;
   letter-spacing: -0.02em;
 }
 
