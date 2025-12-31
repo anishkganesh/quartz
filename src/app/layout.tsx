@@ -16,7 +16,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Quartz - AI-Powered Encyclopedia",
+  title: "Quartz",
   description: "Learn anything with AI-generated articles. Click any concept to explore deeper.",
 };
 

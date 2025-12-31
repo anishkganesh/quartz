@@ -89,6 +89,14 @@ export default function WikiPage() {
     addRecentTopic(rootLabel);
   }, [rootTopic, rootLabel]);
 
+  // Update tab title based on active panel
+  useEffect(() => {
+    if (panelStack.length > 0) {
+      const activePanel = panelStack[panelStack.length - 1];
+      document.title = toTitleCase(activePanel.label);
+    }
+  }, [panelStack]);
+
   const loadContent = async (topic: string, panelIndex: number) => {
     setIsLoading(true);
     setError(null);

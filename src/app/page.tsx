@@ -27,7 +27,7 @@ export default function Home() {
 
       <SearchAutocomplete
         autoFocus
-        placeholder="Search any topic..."
+        placeholder=""
       />
     </div>
   );
