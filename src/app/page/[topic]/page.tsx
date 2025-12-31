@@ -58,8 +58,8 @@ export default function WikiPage() {
 
   // Feature panel state
   const [activeFeature, setActiveFeature] = useState<FeatureType>(null);
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-  const [isPodcastPlaying, setIsPodcastPlaying] = useState(false);
+  const [_isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [_isPodcastPlaying, setIsPodcastPlaying] = useState(false);
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [podcastInitialized, setPodcastInitialized] = useState(false);
 
