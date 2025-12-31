@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Loader2 } from "lucide-react";
+import { Search, ArrowUp } from "lucide-react";
 import { getRecentTopics } from "@/lib/cache";
 
 const SUGGESTED_TOPICS = [
@@ -42,7 +42,6 @@ export default function SearchAutocomplete({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -79,7 +78,6 @@ export default function SearchAutocomplete({
 
     // Create new abort controller
     abortControllerRef.current = new AbortController();
-    setIsLoadingAI(true);
 
     try {
       const response = await fetch("/api/suggest", {
@@ -101,7 +99,7 @@ export default function SearchAutocomplete({
         console.error("AI suggest error:", err);
       }
     } finally {
-      setIsLoadingAI(false);
+      // AI suggestions loaded
     }
   }, []);
 
@@ -110,7 +108,6 @@ export default function SearchAutocomplete({
     if (!query.trim()) {
       setSuggestions([]);
       setIsOpen(false);
-      setIsLoadingAI(false);
       return;
     }
 
@@ -230,8 +227,15 @@ export default function SearchAutocomplete({
           autoFocus={autoFocus}
           className={isModal ? "search-modal-input" : "search-circular"}
         />
-        {isLoadingAI && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-foreground-muted" />
+        {!isModal && (
+          <button
+            type="button"
+            onClick={() => query.trim() && navigateToTopic(query)}
+            className="search-submit-btn"
+            aria-label="Search"
+          >
+            <ArrowUp className="w-4 h-4" />
+          </button>
         )}
       </div>
 
