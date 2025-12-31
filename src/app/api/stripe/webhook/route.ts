@@ -62,14 +62,18 @@ export async function POST(request: NextRequest) {
         console.log("Checkout completed:", { userId, subscriptionId });
 
         if (userId && subscriptionId) {
-          // Get subscription details
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          // Get subscription details - cast to access current_period_end
+          const subscriptionData = await stripe.subscriptions.retrieve(subscriptionId) as unknown as {
+            id: string;
+            current_period_end: number;
+          };
+          
           console.log("Subscription retrieved:", {
-            id: subscription.id,
-            current_period_end: subscription.current_period_end,
+            id: subscriptionData.id,
+            current_period_end: subscriptionData.current_period_end,
           });
 
-          const periodEnd = getPeriodEndDate(subscription.current_period_end);
+          const periodEnd = getPeriodEndDate(subscriptionData.current_period_end);
 
           const { error: upsertError } = await getSupabaseAdmin()
             .from("quartz_subscriptions")
