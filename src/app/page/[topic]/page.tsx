@@ -114,8 +114,6 @@ export default function WikiPage() {
         return updated;
       });
       setIsLoading(false);
-      // Trigger background pre-generation
-      preGenerateContent(topic, cached.content);
       return;
     }
 
@@ -140,9 +138,6 @@ export default function WikiPage() {
         };
         return updated;
       });
-      
-      // Trigger background pre-generation
-      preGenerateContent(topic, data.content);
     } catch (err) {
       setError("Failed to load article");
       console.error(err);
@@ -288,75 +283,6 @@ export default function WikiPage() {
   const handleQuizGenerated = useCallback((topic: string, questions: Question[]) => {
     setCachedQuizData(prev => ({ ...prev, [topic]: questions }));
   }, []);
-
-  // Background pre-generation for fast tools (Audify, Gamify, TikTokify, Videofy)
-  const preGenerateContent = useCallback(async (topic: string, content: string) => {
-    // Skip if no content
-    if (!content) return;
-
-    // Pre-generate Audify in background (if not already cached)
-    if (!cachedAudioUrls[topic]) {
-      fetch("/api/audify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, content }),
-      })
-        .then(res => res.blob())
-        .then(blob => {
-          const url = URL.createObjectURL(blob);
-          setCachedAudioUrls(prev => ({ ...prev, [topic]: url }));
-        })
-        .catch(err => console.error("Background audify error:", err));
-    }
-
-    // Pre-generate Gamify quiz in background (if not already cached)
-    if (!cachedQuizData[topic]) {
-      fetch("/api/gamify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, content }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.questions) {
-            setCachedQuizData(prev => ({ ...prev, [topic]: data.questions }));
-          }
-        })
-        .catch(err => console.error("Background gamify error:", err));
-    }
-
-    // Pre-generate TikTokify in background (if not already cached)
-    if (!cachedTikTokScript[topic]) {
-      fetch("/api/tiktokify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, content }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.script) {
-            setCachedTikTokScript(prev => ({ ...prev, [topic]: data.script }));
-          }
-        })
-        .catch(err => console.error("Background tiktokify error:", err));
-    }
-
-    // Pre-generate Videofy in background (if not already cached)
-    if (!cachedVideoScript[topic]) {
-      fetch("/api/videofy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, content }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.script) {
-            setCachedVideoScript(prev => ({ ...prev, [topic]: data.script }));
-          }
-        })
-        .catch(err => console.error("Background videofy error:", err));
-    }
-  }, [cachedAudioUrls, cachedQuizData, cachedTikTokScript, cachedVideoScript]);
 
   // Get current active panel
   const activePanel = panelStack[panelStack.length - 1];
