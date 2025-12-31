@@ -16,7 +16,7 @@ export default function RelatedQuestions({
 }: RelatedQuestionsProps) {
   const [questions, setQuestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [_error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
 
   useEffect(() => {
     generateQuestions();
