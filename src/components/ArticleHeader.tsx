@@ -168,7 +168,16 @@ export default function ArticleHeader({
         </div>
 
         <div className="header-right">
-          {/* Circular Search Input */}
+          {/* Mobile Search Button */}
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            className="header-btn mobile-search-btn"
+            aria-label="Search"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+          
+          {/* Desktop Search Input */}
           <div className="header-search-wrapper">
             <Search className="header-search-icon" />
             <input
