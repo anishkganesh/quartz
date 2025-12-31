@@ -15,8 +15,6 @@ interface PaywallModalProps {
 export default function PaywallModal({
   isOpen,
   onClose,
-  currentUsage,
-  limit,
 }: PaywallModalProps) {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -58,7 +56,14 @@ export default function PaywallModal({
 
     try {
       if (!user) {
-        await handleSignIn();
+        // Sign in with subscribe flag - will redirect to Stripe after auth
+        if (!supabase) return;
+        await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback?next=${window.location.pathname}&subscribe=true`,
+          },
+        });
         return;
       }
 
@@ -77,7 +82,8 @@ export default function PaywallModal({
       if (data.url) {
         window.location.href = data.url;
       } else {
-        throw new Error("Failed to create checkout session");
+        console.error("Checkout response:", data);
+        throw new Error(data.error || "Failed to create checkout session");
       }
     } catch (error) {
       console.error("Checkout error:", error);
@@ -97,43 +103,38 @@ export default function PaywallModal({
         <p className="paywall-description">
           {isAnonymous 
             ? `You've used your ${LIMITS.anonymous} free articles. Sign in for ${LIMITS.loggedIn} free articles per day, or subscribe for unlimited access.`
-            : "You've reached your daily limit. Subscribe for unlimited access to all features."
+            : "You've reached your daily limit. Subscribe for unlimited access."
           }
         </p>
 
-        <p className="paywall-usage">
-          {currentUsage} / {limit} articles today
-        </p>
-
-        {isAnonymous ? (
-          <>
+        <div className="paywall-buttons">
+          {isAnonymous ? (
+            <>
+              <button
+                className="pill-btn paywall-pill-btn"
+                onClick={handleSignIn}
+                disabled={loading}
+              >
+                {loading ? "..." : "Sign in"}
+              </button>
+              <button
+                className="pill-btn paywall-pill-btn secondary"
+                onClick={handleSubscribe}
+                disabled={loading}
+              >
+                Subscribe · $20/mo
+              </button>
+            </>
+          ) : (
             <button
-              className="paywall-btn"
-              onClick={handleSignIn}
-              disabled={loading}
-            >
-              {loading ? "..." : "Sign in with Google"}
-            </button>
-            <p className="paywall-or">or</p>
-            <button
-              className="paywall-btn-secondary"
-              onClick={handleSubscribe}
-              disabled={loading}
-            >
-              Subscribe · $20/mo
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              className="paywall-btn"
+              className="pill-btn paywall-pill-btn"
               onClick={handleSubscribe}
               disabled={loading}
             >
               {loading ? "..." : "Subscribe · $20/mo"}
             </button>
-          </>
-        )}
+          )}
+        </div>
 
         <button className="paywall-close" onClick={onClose}>
           Maybe later

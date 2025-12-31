@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { User, Session, AuthChangeEvent } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase";
-import Image from "next/image";
+import { LogOut } from "lucide-react";
 
 export default function HeaderAuthButton() {
   const [user, setUser] = useState<User | null>(null);
@@ -49,6 +49,28 @@ export default function HeaderAuthButton() {
     setShowMenu(false);
   };
 
+  // Get user's display name from metadata or email
+  const getUserName = () => {
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name;
+    }
+    if (user?.user_metadata?.name) {
+      return user.user_metadata.name;
+    }
+    // Extract name from email (before @)
+    if (user?.email) {
+      const namePart = user.email.split("@")[0];
+      return namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    }
+    return "User";
+  };
+
+  // Get user's initial
+  const getUserInitial = () => {
+    const name = getUserName();
+    return name.charAt(0).toUpperCase();
+  };
+
   if (loading) {
     return null;
   }
@@ -58,21 +80,10 @@ export default function HeaderAuthButton() {
       <div className="relative">
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className="header-auth-btn logged-in"
+          className="avatar-btn"
+          aria-label="User menu"
         >
-          {user.user_metadata?.avatar_url ? (
-            <Image
-              src={user.user_metadata.avatar_url}
-              alt=""
-              width={24}
-              height={24}
-              className="header-auth-avatar"
-            />
-          ) : (
-            <div className="header-auth-avatar-placeholder">
-              {user.email?.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <span className="avatar-initial">{getUserInitial()}</span>
         </button>
         
         {showMenu && (
@@ -81,16 +92,23 @@ export default function HeaderAuthButton() {
               className="fixed inset-0 z-40" 
               onClick={() => setShowMenu(false)}
             />
-            <div className="header-auth-menu">
-              <div className="header-auth-menu-email">
-                {user.email}
+            <div className="avatar-dropdown">
+              <div className="avatar-dropdown-row">
+                <div className="avatar-dropdown-avatar">
+                  <span>{getUserInitial()}</span>
+                </div>
+                <div className="avatar-dropdown-info">
+                  <span className="avatar-dropdown-name">{getUserName()}</span>
+                  <span className="avatar-dropdown-email">{user.email}</span>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="avatar-dropdown-logout"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={handleSignOut}
-                className="header-auth-menu-item"
-              >
-                Sign Out
-              </button>
             </div>
           </>
         )}

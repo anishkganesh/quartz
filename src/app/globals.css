@@ -1466,14 +1466,14 @@ button {
   font-weight: 500;
 }
 
-/* Header Auth Button (Grokipedia-style) */
+/* Header Auth Button (Login button - Grokipedia-style) */
 .header-auth-btn {
-  padding: 0.5rem 1rem;
+  padding: 0.375rem 0.875rem;
   background: var(--foreground);
   color: var(--background);
   border: none;
   border-radius: 9999px;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   font-family: var(--font-sans);
   cursor: pointer;
@@ -1484,67 +1484,151 @@ button {
   opacity: 0.9;
 }
 
-.header-auth-btn.logged-in {
-  padding: 0.25rem;
-  background: transparent;
-}
-
-.header-auth-avatar {
+/* Avatar Button (logged-in state - matches header-btn size) */
+.avatar-btn {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  object-fit: cover;
-}
-
-.header-auth-avatar-placeholder {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--foreground);
-  color: var(--background);
+  background: #e5e5e5;
+  border: none;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 600;
+  transition: all 0.15s ease;
 }
 
-.header-auth-menu {
+[data-theme="dark"] .avatar-btn {
+  background: #404040;
+}
+
+.avatar-btn:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+.avatar-initial {
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: #1a1a1a;
+  line-height: 1;
+}
+
+[data-theme="dark"] .avatar-initial {
+  color: #f5f5f5;
+}
+
+/* Avatar Dropdown (Grokipedia-style one-liner) */
+.avatar-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 0.5rem);
   right: 0;
-  margin-top: 0.5rem;
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
+  background: #f5f5f5;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   z-index: 50;
   overflow: hidden;
+  min-width: 280px;
 }
 
-.header-auth-menu-email {
-  padding: 0.75rem 1rem;
+[data-theme="dark"] .avatar-dropdown {
+  background: #2a2a2a;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.avatar-dropdown-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+}
+
+.avatar-dropdown-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #d4d4d4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .avatar-dropdown-avatar {
+  background: #525252;
+}
+
+.avatar-dropdown-avatar span {
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: #1a1a1a;
+}
+
+[data-theme="dark"] .avatar-dropdown-avatar span {
+  color: #f5f5f5;
+}
+
+.avatar-dropdown-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.avatar-dropdown-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: #1a1a1a;
+  line-height: 1.3;
+}
+
+[data-theme="dark"] .avatar-dropdown-name {
+  color: #f5f5f5;
+}
+
+.avatar-dropdown-email {
   font-size: 0.8125rem;
-  color: var(--foreground-muted);
-  border-bottom: 1px solid var(--border);
-  word-break: break-all;
+  font-family: var(--font-sans);
+  color: #737373;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.header-auth-menu-item {
-  width: 100%;
-  padding: 0.75rem 1rem;
+[data-theme="dark"] .avatar-dropdown-email {
+  color: #a3a3a3;
+}
+
+.avatar-dropdown-logout {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   background: transparent;
   border: none;
-  text-align: left;
-  font-size: 0.875rem;
-  color: var(--foreground);
   cursor: pointer;
-  transition: background 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #991b1b;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: all 0.15s ease;
 }
 
-.header-auth-menu-item:hover {
-  background: var(--background-tertiary);
+.avatar-dropdown-logout:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .avatar-dropdown-logout {
+  color: #b91c1c;
+}
+
+[data-theme="dark"] .avatar-dropdown-logout:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* ============================================
@@ -1554,7 +1638,7 @@ button {
 .paywall-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -1565,94 +1649,59 @@ button {
 .paywall-modal {
   background: var(--background);
   border-radius: 0.75rem;
-  padding: 2rem;
-  max-width: 360px;
+  padding: 1.5rem;
+  max-width: 320px;
   width: 90%;
   text-align: center;
 }
 
 .paywall-title {
   font-family: var(--font-serif);
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 500;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   color: var(--foreground);
 }
 
 .paywall-description {
   color: var(--foreground-muted);
-  font-size: 0.875rem;
-  margin-bottom: 1.25rem;
+  font-size: 0.8125rem;
+  margin-bottom: 1rem;
   line-height: 1.5;
 }
 
-.paywall-usage {
-  color: var(--foreground-subtle);
-  font-size: 0.8125rem;
-  margin-bottom: 1.5rem;
+.paywall-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.paywall-btn {
+.paywall-pill-btn {
   width: 100%;
-  padding: 0.75rem 1.25rem;
-  background: var(--foreground);
-  color: var(--background);
-  border: none;
-  border-radius: 9999px;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
+  justify-content: center;
 }
 
-.paywall-btn:hover {
-  opacity: 0.9;
-}
-
-.paywall-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.paywall-or {
-  color: var(--foreground-subtle);
-  font-size: 0.8125rem;
-  margin: 0.75rem 0;
-}
-
-.paywall-btn-secondary {
-  width: 100%;
-  padding: 0.75rem 1.25rem;
+.paywall-pill-btn.secondary {
   background: transparent;
   color: var(--foreground);
   border: 1px solid var(--border);
-  border-radius: 9999px;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.paywall-btn-secondary:hover {
+.paywall-pill-btn.secondary:hover:not(:disabled) {
   background: var(--background-tertiary);
+  box-shadow: none;
 }
 
 .paywall-close {
   background: transparent;
   border: none;
   color: var(--foreground-muted);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   cursor: pointer;
-  padding: 0.75rem;
-  margin-top: 0.5rem;
+  padding: 0.5rem;
+  margin-top: 0.75rem;
 }
 
 .paywall-close:hover {
   color: var(--foreground);
-}
-
-.paywall-usage {
-  color: var(--foreground-subtle);
-  font-size: 0.8125rem;
-  margin-bottom: 1rem;
 }

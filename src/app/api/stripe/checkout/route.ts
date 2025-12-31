@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe, PRICE_ID } from "@/lib/stripe";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServiceRoleClient } from "@/lib/supabase-server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,14 +20,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createServerSupabaseClient();
+    // Use service role client to bypass RLS
+    const supabase = createServiceRoleClient();
 
     // Check if user already has a Stripe customer ID
-    const { data: existingSubscription } = await supabase
+    const { data: existingSubscription, error: fetchError } = await supabase
       .from("quartz_subscriptions")
       .select("stripe_customer_id")
       .eq("user_id", userId)
       .single();
+
+    if (fetchError && fetchError.code !== "PGRST116") {
+      // PGRST116 = no rows found, which is fine
+      console.error("Error fetching subscription:", fetchError);
+    }
 
     let customerId = existingSubscription?.stripe_customer_id;
 
@@ -42,11 +48,16 @@ export async function POST(request: NextRequest) {
       customerId = customer.id;
 
       // Save customer ID to database
-      await supabase.from("quartz_subscriptions").upsert({
+      const { error: upsertError } = await supabase.from("quartz_subscriptions").upsert({
         user_id: userId,
         stripe_customer_id: customerId,
         status: "inactive",
       });
+
+      if (upsertError) {
+        console.error("Error saving customer ID:", upsertError);
+        // Continue anyway - we have the Stripe customer
+      }
     }
 
     // Create checkout session
@@ -70,8 +81,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error("Checkout error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to create checkout session" },
+      { error: `Failed to create checkout session: ${errorMessage}` },
       { status: 500 }
     );
   }
