@@ -11,16 +11,17 @@ export default function Icon() {
     (
       <div
         style={{
-          fontSize: 28,
+          fontSize: 26,
           background: "#f5f5f5",
           width: "100%",
           height: "100%",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontFamily: "Georgia, Times New Roman, serif",
-          fontWeight: 700,
+          fontFamily: "serif",
+          fontWeight: 400,
           color: "#1a1a1a",
+          letterSpacing: "-0.02em",
         }}
       >
         Q
