@@ -56,12 +56,13 @@ export default function PaywallModal({
 
     try {
       if (!user) {
-        // Sign in with subscribe flag - will redirect to Stripe after auth
+        // Store subscribe intent in localStorage before OAuth redirect
+        localStorage.setItem("quartz_subscribe_intent", "true");
         if (!supabase) return;
         await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
-            redirectTo: `${window.location.origin}/auth/callback?next=${window.location.pathname}&subscribe=true`,
+            redirectTo: `${window.location.origin}/auth/callback?next=${window.location.pathname}`,
           },
         });
         return;
