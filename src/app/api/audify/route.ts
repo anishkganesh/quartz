@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { textToSpeech, VOICES, ELEVENLABS_API_KEY } from "@/lib/elevenlabs";
 import { openai } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
@@ -26,32 +25,18 @@ export async function POST(request: NextRequest) {
       .replace(/\n{3,}/g, "\n\n") // Normalize line breaks
       .trim();
 
-    let audioBuffer: ArrayBuffer;
-
-    // Try ElevenLabs first, fall back to OpenAI if not configured
-    if (ELEVENLABS_API_KEY) {
-      console.log("Audify: Using ElevenLabs TTS");
-      // ElevenLabs has a higher character limit
-      if (textToSpeak.length > 10000) {
-        textToSpeak = textToSpeak.slice(0, 10000) + "...";
-      }
-      audioBuffer = await textToSpeech({
-        text: textToSpeak,
-        voiceId: VOICES.narrator,
-      });
-    } else {
-      console.log("Audify: ElevenLabs not configured, using OpenAI TTS");
-      // OpenAI has a 4096 character limit
-      if (textToSpeak.length > 4000) {
-        textToSpeak = textToSpeak.slice(0, 4000) + "...";
-      }
-      const mp3Response = await openai.audio.speech.create({
-        model: "tts-1",
-        voice: "nova",
-        input: textToSpeak,
-      });
-      audioBuffer = await mp3Response.arrayBuffer();
+    // OpenAI TTS has a 4096 character limit
+    if (textToSpeak.length > 4000) {
+      textToSpeak = textToSpeak.slice(0, 4000) + "...";
     }
+
+    console.log("Audify: Generating audio with OpenAI TTS");
+    const mp3Response = await openai.audio.speech.create({
+      model: "tts-1",
+      voice: "nova",
+      input: textToSpeak,
+    });
+    const audioBuffer = await mp3Response.arrayBuffer();
 
     // Return the audio as a response
     return new NextResponse(audioBuffer, {
