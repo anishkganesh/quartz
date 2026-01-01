@@ -247,7 +247,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
   return (
     <button
       onClick={handleClick}
-      className="toolbar-btn"
+      className={`toolbar-btn ${isActive ? "recording" : ""}`}
       aria-label={isActive ? "Stop voice input" : "Voice input"}
       title={isActive ? "Stop voice input" : "Voice input"}
     >
