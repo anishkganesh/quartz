@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { openai } from "@/lib/openai";
+import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
 
 export const maxDuration = 120; // 2 minutes for audio generation
 
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Generate dialogue script
     const apiResponse = await openai.responses.create({
-      model: "gpt-5.2",
+      model: AI_MODEL,
       input: [
         {
           role: "system",
@@ -53,7 +53,7 @@ Generate 8-10 exchanges (16-20 lines total) to keep audio generation manageable.
           content: `Create a podcast conversation about "${topic}". Use this content as reference:\n\n${content?.slice(0, 2000) || "Generate from the topic name"}`,
         },
       ],
-      reasoning: { effort: "none" },
+      reasoning: { effort: AI_REASONING_EFFORT },
       temperature: 0.85,
       max_output_tokens: 1500,
     });

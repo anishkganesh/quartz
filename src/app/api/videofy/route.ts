@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { openai } from "@/lib/openai";
+import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     // Generate a video prompt with GPT-5.2
     console.log("Videofy: Generating video prompt...");
     const promptResponse = await openai.responses.create({
-      model: "gpt-5.2",
+      model: AI_MODEL,
       input: [
         {
           role: "system",
@@ -39,7 +39,7 @@ ${content?.slice(0, 1500) || "Generate from the topic name"}
 The video should be horizontal (landscape 16:9), 8 seconds, visually educational.`,
         },
       ],
-      reasoning: { effort: "none" },
+      reasoning: { effort: AI_REASONING_EFFORT },
       temperature: 0.85,
       max_output_tokens: 300,
     });

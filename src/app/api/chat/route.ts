@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { openai, CHAT_SYSTEM_PROMPT } from "@/lib/openai";
+import { openai, CHAT_SYSTEM_PROMPT, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -29,7 +29,7 @@ ${articleContent?.slice(0, 8000) || "No article content provided."}
 Answer questions based on this article and your general knowledge.`;
 
     const completion = await openai.responses.create({
-      model: "gpt-5.2",
+      model: AI_MODEL,
       input: [
         { role: "system", content: systemMessage },
         ...messages.map((msg: ChatMessage) => ({
@@ -37,7 +37,7 @@ Answer questions based on this article and your general knowledge.`;
           content: msg.content,
         })),
       ],
-      reasoning: { effort: "none" },
+      reasoning: { effort: AI_REASONING_EFFORT },
       temperature: 0.7,
       max_output_tokens: 1000,
     });

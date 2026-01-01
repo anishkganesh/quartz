@@ -1229,6 +1229,11 @@ p {
   color: var(--foreground-muted);
 }
 
+/* Section skeleton - shows while next section is loading */
+.section-skeleton {
+  margin-top: 1.5rem;
+}
+
 /* ============================================
    UTILITIES
    ============================================ */
@@ -1308,7 +1313,6 @@ button {
 
 .toolbar-btn.recording {
   color: #ef4444;
-  animation: pulse-recording 1.5s ease-in-out infinite;
 }
 
 @keyframes pulse-recording {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { openai } from "@/lib/openai";
+import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Detect intent with GPT-5.2 - VERY CONSERVATIVE
     const intentResponse = await openai.responses.create({
-      model: "gpt-5.2",
+      model: AI_MODEL,
       input: [
         {
           role: "system",
@@ -93,7 +93,7 @@ Examples of TOPIC (explicit navigation/expansion):
           content: text,
         },
       ],
-      reasoning: { effort: "none" },
+      reasoning: { effort: AI_REASONING_EFFORT },
       temperature: 0.1,
       max_output_tokens: 150,
     });

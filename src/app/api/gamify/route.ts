@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { openai } from "@/lib/openai";
+import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,14 +13,14 @@ export async function POST(request: NextRequest) {
     }
 
     const apiResponse = await openai.responses.create({
-      model: "gpt-5.2",
+      model: AI_MODEL,
       input: [
         {
           role: "system",
           content: `You are a quiz generator. Create a multiple-choice quiz to test understanding of the topic.
 
 Rules:
-- Generate exactly 5 questions
+- Generate exactly 3 questions
 - Each question has exactly 4 options (A, B, C, D)
 - Questions should range from basic recall to deeper understanding
 - Include clear, educational explanations for correct answers
@@ -45,7 +45,7 @@ Make sure correctIndex is 0-3 (the index of the correct option in the options ar
           content: `Create a quiz about "${topic}". Use this content as reference:\n\n${content?.slice(0, 2000) || "Generate from the topic name"}`,
         },
       ],
-      reasoning: { effort: "none" },
+      reasoning: { effort: AI_REASONING_EFFORT },
       temperature: 0.7,
       max_output_tokens: 2000,
     });

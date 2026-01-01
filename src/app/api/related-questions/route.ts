@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { openai } from "@/lib/openai";
+import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const apiResponse = await openai.responses.create({
-      model: "gpt-5.2",
+      model: AI_MODEL,
       input: [
         {
           role: "system",
@@ -36,7 +36,7 @@ ${content?.slice(0, 2000) || "Generate questions based on the topic name"}
 Generate 5 related questions.`,
         },
       ],
-      reasoning: { effort: "none" },
+      reasoning: { effort: AI_REASONING_EFFORT },
       temperature: 0.8,
       max_output_tokens: 500,
     });

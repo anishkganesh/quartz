@@ -32,7 +32,9 @@ export default function SimplifyPanel({
   simplifiedContents,
 }: SimplifyPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState<string>("");
 
   const handleSimplify = async () => {
     if (currentLevel >= 5) return;
@@ -46,7 +48,9 @@ export default function SimplifyPanel({
     }
 
     setIsLoading(true);
+    setIsStreaming(false);
     setError(null);
+    setStreamingContent("");
 
     try {
       const response = await fetch("/api/simplify", {
@@ -63,18 +67,59 @@ export default function SimplifyPanel({
         throw new Error("Failed to simplify");
       }
 
-      const data = await response.json();
-      onLevelChange(nextLevel, data.content);
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader available");
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      // Show streaming state
+      setIsLoading(false);
+      setIsStreaming(true);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === "section") {
+                fullContent += data.content;
+                setStreamingContent(fullContent);
+              } else if (data.type === "done") {
+                // Final content
+                onLevelChange(nextLevel, data.content);
+                setStreamingContent("");
+              } else if (data.type === "error") {
+                throw new Error(data.message);
+              }
+            } catch (parseError) {
+              // Ignore parse errors for incomplete chunks
+            }
+          }
+        }
+      }
+
+      setIsStreaming(false);
     } catch (err) {
       setError("Failed to simplify. Please try again.");
       console.error(err);
-    } finally {
       setIsLoading(false);
+      setIsStreaming(false);
     }
   };
 
   const currentLevelInfo = LEVELS[currentLevel - 1];
-  const displayContent = simplifiedContents[currentLevel] || originalContent;
+  const displayContent = isStreaming 
+    ? streamingContent 
+    : (simplifiedContents[currentLevel] || originalContent);
 
   return (
     <div className="feature-panel">
@@ -107,10 +152,10 @@ export default function SimplifyPanel({
             {currentLevel < 5 && (
               <button
                 onClick={handleSimplify}
-                disabled={isLoading}
+                disabled={isLoading || isStreaming}
                 className="pill-btn text-sm"
               >
-                {isLoading ? (
+                {isLoading || isStreaming ? (
                   <>
                     <div className="spinner" />
                     <span>Simplifying...</span>
@@ -144,9 +189,19 @@ export default function SimplifyPanel({
             content={displayContent}
             onConceptClick={onConceptClick}
           />
+          {/* Skeleton loader for next section while streaming */}
+          {isStreaming && (
+            <div className="section-skeleton">
+              <div className="skeleton h-6 w-2/5 mt-8 mb-4" />
+              <div className="skeleton h-4 w-full" />
+              <div className="skeleton h-4 w-full" />
+              <div className="skeleton h-4 w-4/5" />
+              <div className="skeleton h-4 w-full" />
+              <div className="skeleton h-4 w-3/4" />
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
-

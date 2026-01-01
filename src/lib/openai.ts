@@ -4,6 +4,72 @@ export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Model configuration for comparison testing
+export const MODEL_OPTIONS = {
+  "gpt-4-turbo": {
+    model: "gpt-4-turbo",
+    useResponsesAPI: false, // Uses chat.completions
+    supportsTemperature: true,
+    supportsReasoning: false,
+  },
+  "gpt-5.2": {
+    model: "gpt-5.2",
+    useResponsesAPI: true, // Uses responses API
+    supportsTemperature: true,
+    supportsReasoning: true,
+  },
+} as const;
+
+export type ModelKey = keyof typeof MODEL_OPTIONS;
+
+// Active model for production - can be overridden via env
+export const ACTIVE_MODEL = (process.env.AI_MODEL || "gpt-5.2") as ModelKey;
+export const AI_MODEL = MODEL_OPTIONS[ACTIVE_MODEL].model;
+export const AI_REASONING_EFFORT = "none" as const;
+
+// Helper function to call OpenAI with the appropriate API based on model
+export async function callModel(
+  modelKey: ModelKey,
+  systemPrompt: string,
+  userPrompt: string,
+  options: { temperature?: number; maxTokens?: number } = {}
+): Promise<{ output: string; timeMs: number }> {
+  const config = MODEL_OPTIONS[modelKey];
+  const startTime = Date.now();
+  
+  let output: string;
+  
+  if (config.useResponsesAPI) {
+    // GPT-5.2 uses responses API
+    const response = await openai.responses.create({
+      model: config.model,
+      input: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      reasoning: config.supportsReasoning ? { effort: "none" } : undefined,
+      temperature: config.supportsTemperature ? (options.temperature ?? 0.7) : undefined,
+      max_output_tokens: options.maxTokens ?? 2500,
+    });
+    output = response.output_text || "";
+  } else {
+    // GPT-4 Turbo uses chat.completions API
+    const response = await openai.chat.completions.create({
+      model: config.model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.maxTokens ?? 2500,
+    });
+    output = response.choices[0]?.message?.content || "";
+  }
+  
+  const timeMs = Date.now() - startTime;
+  return { output, timeMs };
+}
+
 export const WIKI_SYSTEM_PROMPT = `You are an expert encyclopedia writer creating comprehensive articles. Your task is to generate educational content with MAXIMUM clickable concept links for deep exploration.
 
 CRITICAL: Mark EVERY explorable concept using double brackets [[like this]]. Be EXTREMELY LIBERAL - if someone could learn more about it, mark it!

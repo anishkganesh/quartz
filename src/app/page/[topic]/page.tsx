@@ -57,6 +57,7 @@ export default function WikiPage() {
     },
   ]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Feature panel state
@@ -108,6 +109,7 @@ export default function WikiPage() {
 
   const loadContent = async (topic: string, panelIndex: number) => {
     setIsLoading(true);
+    setIsStreaming(false);
     setError(null);
 
     // Check cache first - cached content doesn't count against limit
@@ -126,8 +128,9 @@ export default function WikiPage() {
       return;
     }
 
-    // Check usage limit before generating new content
-    if (!usageCheckedRef.current.has(topic)) {
+    // Check usage limit before generating new content (skip in dev mode)
+    const isDev = process.env.NODE_ENV === 'development';
+    if (!isDev && !usageCheckedRef.current.has(topic)) {
       let user = null;
       if (supabase) {
         const { data } = await supabase.auth.getUser();
@@ -154,8 +157,8 @@ export default function WikiPage() {
         body: JSON.stringify({ topic }),
       });
 
-      if (response.status === 429) {
-        // Rate limited - show paywall
+      // Check for rate limit (JSON response) - skip in dev mode
+      if (!isDev && response.status === 429) {
         const data = await response.json();
         setUsageInfo({ used: data.currentUsage || LIMITS.loggedIn, limit: LIMITS.loggedIn });
         setShowPaywall(true);
@@ -165,34 +168,90 @@ export default function WikiPage() {
 
       if (!response.ok) throw new Error("Failed to generate");
 
-      const data = await response.json();
-      saveToCache(topic, data.content);
-      usageCheckedRef.current.add(topic);
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No reader available");
 
-      // Increment anonymous usage
-      let currentUser = null;
-      if (supabase) {
-        const { data } = await supabase.auth.getUser();
-        currentUser = data.user;
-      }
-      if (!currentUser) {
-        incrementAnonUsage();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      // Show streaming state - content is arriving
+      setIsLoading(false);
+      setIsStreaming(true);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === "section") {
+                // Append section content
+                fullContent += data.content;
+                
+                // Update panel with current content
+                setPanelStack((prev) => {
+                  const updated = [...prev];
+                  if (updated[panelIndex]) {
+                    updated[panelIndex] = {
+                      ...updated[panelIndex],
+                      content: fullContent,
+                      simplifiedContents: { 1: fullContent },
+                    };
+                  }
+                  return updated;
+                });
+              } else if (data.type === "done") {
+                // Final content - cache it
+                saveToCache(topic, data.content);
+                usageCheckedRef.current.add(topic);
+                
+                // Increment anonymous usage (skip in dev mode)
+                if (!isDev) {
+                  let currentUser = null;
+                  if (supabase) {
+                    const { data: userData } = await supabase.auth.getUser();
+                    currentUser = userData.user;
+                  }
+                  if (!currentUser) {
+                    incrementAnonUsage();
+                  }
+                }
+
+                // Final update with complete content
+                setPanelStack((prev) => {
+                  const updated = [...prev];
+                  if (updated[panelIndex]) {
+                    updated[panelIndex] = {
+                      ...updated[panelIndex],
+                      content: data.content,
+                      simplifiedContents: { 1: data.content },
+                    };
+                  }
+                  return updated;
+                });
+              } else if (data.type === "error") {
+                throw new Error(data.message);
+              }
+            } catch (parseError) {
+              // Ignore parse errors for incomplete chunks
+            }
+          }
+        }
       }
 
-      setPanelStack((prev) => {
-        const updated = [...prev];
-        updated[panelIndex] = {
-          ...updated[panelIndex],
-          content: data.content,
-          simplifiedContents: { 1: data.content },
-        };
-        return updated;
-      });
+      setIsStreaming(false);
     } catch (err) {
       setError("Failed to load article");
       console.error(err);
-    } finally {
       setIsLoading(false);
+      setIsStreaming(false);
     }
   };
 
@@ -424,8 +483,19 @@ export default function WikiPage() {
                           content={panel.content}
                           onConceptClick={handleConceptClick}
                         />
-                        {/* Related Questions - only on main panel */}
-                        {isLast && panel.content && (
+                        {/* Skeleton loader for next section while streaming */}
+                        {isStreaming && isLast && (
+                          <div className="section-skeleton">
+                            <div className="skeleton h-6 w-2/5 mt-8 mb-4" />
+                            <div className="skeleton h-4 w-full" />
+                            <div className="skeleton h-4 w-full" />
+                            <div className="skeleton h-4 w-4/5" />
+                            <div className="skeleton h-4 w-full" />
+                            <div className="skeleton h-4 w-3/4" />
+                          </div>
+                        )}
+                        {/* Related Questions - only on main panel when not streaming */}
+                        {isLast && panel.content && !isStreaming && (
                           <RelatedQuestions
                             topic={panel.topic}
                             content={panel.content}

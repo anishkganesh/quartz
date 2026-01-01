@@ -1,38 +1,45 @@
-import { NextRequest, NextResponse } from "next/server";
-import { openai, WIKI_SYSTEM_PROMPT } from "@/lib/openai";
+import { NextRequest } from "next/server";
+import { openai, WIKI_SYSTEM_PROMPT, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkUsage, incrementUsage } from "@/lib/usage";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
     const { topic } = await request.json();
 
     if (!topic || typeof topic !== "string") {
-      return NextResponse.json(
-        { error: "Topic is required" },
-        { status: 400 }
-      );
+      return new Response(JSON.stringify({ error: "Topic is required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    // Check authentication and usage
+    // Check authentication and usage (skip in dev mode)
+    const isDev = process.env.NODE_ENV === 'development';
     const supabase = await createServerSupabaseClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // If user is logged in, check usage limits
-    if (user) {
+    // If user is logged in, check usage limits (skip in dev mode)
+    if (!isDev && user) {
       const usage = await checkUsage(supabase, user.id);
 
       if (!usage.canGenerate) {
-        return NextResponse.json(
-          {
+        return new Response(
+          JSON.stringify({
             error: "usage_limit",
             message: "Daily limit reached",
-            currentCount: usage.currentCount,
+            currentUsage: usage.currentCount,
             limit: usage.limit,
-          },
-          { status: 429 }
+          }),
+          {
+            status: 429,
+            headers: { "Content-Type": "application/json" },
+          }
         );
       }
     }
@@ -40,16 +47,48 @@ export async function POST(request: NextRequest) {
     // Clean up the topic name
     const cleanTopic = topic.replace(/_/g, " ").trim();
 
-    const response = await openai.responses.create({
-      model: "gpt-5.2",
-      input: [
-        {
-          role: "system",
-          content: WIKI_SYSTEM_PROMPT,
-        },
-        {
-          role: "user",
-          content: `Write a comprehensive encyclopedia article about "${cleanTopic}".
+    // Increment usage for logged-in users at start of generation (skip in dev mode)
+    if (!isDev && user) {
+      await incrementUsage(supabase, user.id);
+    }
+
+    const encoder = new TextEncoder();
+    let isClosed = false;
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const safeEnqueue = (data: string) => {
+          if (!isClosed) {
+            try {
+              controller.enqueue(encoder.encode(data));
+            } catch {
+              isClosed = true;
+            }
+          }
+        };
+
+        const safeClose = () => {
+          if (!isClosed) {
+            try {
+              controller.close();
+              isClosed = true;
+            } catch {
+              isClosed = true;
+            }
+          }
+        };
+
+        try {
+          const response = await openai.responses.create({
+            model: AI_MODEL,
+            input: [
+              {
+                role: "system",
+                content: WIKI_SYSTEM_PROMPT,
+              },
+              {
+                role: "user",
+                content: `Write a comprehensive encyclopedia article about "${cleanTopic}".
 
 Requirements:
 1. Start with a brief introduction (2-3 sentences, no heading)
@@ -68,33 +107,84 @@ CONCEPT MARKING - Mark ALL of these:
 - Both multi-word phrases ([[quantum entanglement]]) and single concepts ([[energy]])
 
 Example: If writing about UV light, mark [[UVA]], [[UVB]], [[UVC]], [[sunscreen]], [[skin cancer]], [[ozone layer]], etc. - each as a separate clickable concept.`,
-        },
-      ],
-      reasoning: { effort: "none" },
-      temperature: 0.7,
-      max_output_tokens: 2500,
+              },
+            ],
+            reasoning: { effort: AI_REASONING_EFFORT },
+            temperature: 0.7,
+            max_output_tokens: 2500,
+            stream: true,
+          });
+
+          let buffer = "";
+          let fullContent = "";
+
+          for await (const event of response) {
+            if (isClosed) break;
+
+            if (event.type === "response.output_text.delta") {
+              const delta = event.delta || "";
+              if (delta) {
+                buffer += delta;
+                fullContent += delta;
+
+                // Check for complete sections (text ending with ## heading)
+                const sectionPattern = /\n(## [^\n]+)/g;
+                let match;
+                let lastSectionEnd = 0;
+
+                while ((match = sectionPattern.exec(buffer)) !== null) {
+                  // Found a new section heading - send everything before it
+                  const sectionContent = buffer.slice(0, match.index);
+                  if (sectionContent.trim()) {
+                    safeEnqueue(`data: ${JSON.stringify({ type: "section", content: sectionContent })}\n\n`);
+                  }
+                  lastSectionEnd = match.index;
+                }
+
+                // Keep the remaining content (from last section heading onwards) in buffer
+                if (lastSectionEnd > 0) {
+                  buffer = buffer.slice(lastSectionEnd);
+                }
+              }
+            }
+          }
+
+          // Send any remaining content as final section
+          if (buffer.trim()) {
+            safeEnqueue(`data: ${JSON.stringify({ type: "section", content: buffer })}\n\n`);
+          }
+
+          // Send completion event with full content for caching
+          safeEnqueue(`data: ${JSON.stringify({ type: "done", content: fullContent, topic: cleanTopic })}\n\n`);
+          safeClose();
+        } catch (error) {
+          console.error("Streaming error:", error);
+          if (!isClosed) {
+            safeEnqueue(`data: ${JSON.stringify({ type: "error", message: error instanceof Error ? error.message : "Unknown error" })}\n\n`);
+            safeClose();
+          }
+        }
+      },
+      cancel() {
+        isClosed = true;
+      },
     });
 
-    const content = response.output_text;
-
-    if (!content) {
-      return NextResponse.json(
-        { error: "Failed to generate content" },
-        { status: 500 }
-      );
-    }
-
-    // Increment usage for logged-in users
-    if (user) {
-      await incrementUsage(supabase, user.id);
-    }
-
-    return NextResponse.json({ content, topic: cleanTopic });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error) {
-    console.error("Generation error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate article" },
-      { status: 500 }
+    console.error("Generate error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to generate article" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
     );
   }
 }
