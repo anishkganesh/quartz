@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { X } from "lucide-react";
+import { X, Volume2 } from "lucide-react";
 import ArticleHeader from "@/components/ArticleHeader";
 import TableOfContents from "@/components/TableOfContents";
 import FeatureToolbar, { FeatureType } from "@/components/FeatureToolbar";
@@ -92,6 +92,10 @@ export default function WikiPage() {
   const [usageInfo, setUsageInfo] = useState<{ used: number; limit: number }>({ used: 0, limit: LIMITS.anonymous });
   const supabase = getSupabaseClient();
   const usageCheckedRef = useRef<Set<string>>(new Set());
+
+  // Inline audio player ref
+  const inlineAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isLoadingInlineAudio, setIsLoadingInlineAudio] = useState(false);
 
   // Load content for root panel
   useEffect(() => {
@@ -323,6 +327,46 @@ export default function WikiPage() {
       });
     },
     []
+
+  // Handle inline audio play
+  const handleInlineAudioPlay = useCallback(async (topic: string, content: string) => {
+    // If already have cached audio, just play it
+    if (cachedAudioUrls[topic]) {
+      if (inlineAudioRef.current) {
+        inlineAudioRef.current.src = cachedAudioUrls[topic];
+        inlineAudioRef.current.play();
+      }
+      return;
+    }
+
+    // Generate audio
+    setIsLoadingInlineAudio(true);
+    try {
+      const response = await fetch("/api/audify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, topic }),
+      });
+
+      if (!response.ok) throw new Error("Failed to generate audio");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      
+      // Cache the URL
+      setCachedAudioUrls(prev => ({ ...prev, [topic]: url }));
+      
+      // Play the audio
+      if (inlineAudioRef.current) {
+        inlineAudioRef.current.src = url;
+        inlineAudioRef.current.play();
+      }
+    } catch (error) {
+      console.error("Failed to play audio:", error);
+    } finally {
+      setIsLoadingInlineAudio(false);
+    }
+  }, [cachedAudioUrls]
   );
 
   // Handle text selection
@@ -450,7 +494,19 @@ export default function WikiPage() {
                 >
                   <div className="panel-content">
                     <div className="panel-header">
-                      <h1>{toTitleCase(panel.label)}</h1>
+                      <div className="panel-title-row">
+                        <h1>{toTitleCase(panel.label)}</h1>
+                        {panel.content && (
+                          <button
+                            onClick={() => handleInlineAudioPlay(panel.topic, panel.content)}
+                            className="toolbar-btn inline-audio-btn"
+                            aria-label="Play article audio"
+                            disabled={isLoadingInlineAudio}
+                          >
+                            <Volume2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                       {hasTwoPanels && isLast && (
                         <button
                           onClick={() => handleClosePanel(panelStack.length - 1)}
@@ -642,6 +698,9 @@ export default function WikiPage() {
           currentUsage={usageInfo.used}
           limit={usageInfo.limit}
         />
+
+        {/* Hidden audio element for inline playback */}
+        <audio ref={inlineAudioRef} style={{ display: 'none' }} />
       </div>
     </div>
   );

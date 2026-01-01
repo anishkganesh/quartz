@@ -482,9 +482,15 @@ p {
   position: relative;
 }
 
-.toolbar-btn:hover {
+.toolbar-btn:hover:not(.disabled) {
   color: var(--foreground);
   box-shadow: var(--shadow-hover);
+}
+
+.toolbar-btn.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* No active state visual - tooltip only */
@@ -635,6 +641,22 @@ p {
   flex: 1;
   margin: 0;
   line-height: 1.2;
+}
+
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.inline-audio-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.inline-audio-btn:hover {
+  opacity: 1;
 }
 
 /* Close button - consistent positioning */

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { openai } from "@/lib/openai";
+import { textToSpeech, VOICES } from "@/lib/elevenlabs";
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,26 +25,22 @@ export async function POST(request: NextRequest) {
       .replace(/\n{3,}/g, "\n\n") // Normalize line breaks
       .trim();
 
-    // Limit text length for TTS (OpenAI has a 4096 character limit)
-    if (textToSpeak.length > 4000) {
-      textToSpeak = textToSpeak.slice(0, 4000) + "...";
+    // ElevenLabs has a higher character limit, but let's be reasonable
+    if (textToSpeak.length > 10000) {
+      textToSpeak = textToSpeak.slice(0, 10000) + "...";
     }
 
-    // Generate speech using OpenAI TTS
-    const mp3Response = await openai.audio.speech.create({
-      model: "tts-1",
-      voice: "nova",
-      input: textToSpeak,
+    // Generate speech using ElevenLabs
+    const audioBuffer = await textToSpeech({
+      text: textToSpeak,
+      voiceId: VOICES.narrator,
     });
 
-    // Get the audio as an ArrayBuffer
-    const arrayBuffer = await mp3Response.arrayBuffer();
-
     // Return the audio as a response
-    return new NextResponse(arrayBuffer, {
+    return new NextResponse(audioBuffer, {
       headers: {
         "Content-Type": "audio/mpeg",
-        "Content-Length": arrayBuffer.byteLength.toString(),
+        "Content-Length": audioBuffer.byteLength.toString(),
       },
     });
   } catch (error) {
@@ -55,4 +51,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

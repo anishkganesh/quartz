@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
+import { textToSpeech, VOICES } from "@/lib/elevenlabs";
 
 export const maxDuration = 120; // 2 minutes for audio generation
 
@@ -94,28 +95,24 @@ Generate 8-10 exchanges (16-20 lines total) to keep audio generation manageable.
 
     console.log(`Podcastify: Parsed ${dialogue.length} dialogue lines`);
 
-    // Step 2: Generate audio for each dialogue line
+    // Step 2: Generate audio for each dialogue line using ElevenLabs
     const audioChunks: Buffer[] = [];
     let audioGenerationFailed = false;
 
-    console.log("Podcastify: Starting audio generation...");
+    console.log("Podcastify: Starting audio generation with ElevenLabs...");
 
     for (let i = 0; i < dialogue.length; i++) {
       const line = dialogue[i];
-      // Use 'echo' for Host, 'nova' for Guest
-      const voice = line.speaker === "Host" ? "echo" : "nova";
+      // Use different ElevenLabs voices for Host and Guest
+      const voiceId = line.speaker === "Host" ? VOICES.host : VOICES.guest;
 
       try {
         console.log(`Podcastify: Generating audio ${i + 1}/${dialogue.length} (${line.speaker})`);
-        const audioResponse = await openai.audio.speech.create({
-          model: "tts-1",
-          voice: voice,
-          input: line.text,
-          response_format: "mp3",
+        const audioBuffer = await textToSpeech({
+          text: line.text,
+          voiceId,
         });
-
-        const arrayBuffer = await audioResponse.arrayBuffer();
-        audioChunks.push(Buffer.from(arrayBuffer));
+        audioChunks.push(Buffer.from(audioBuffer));
       } catch (audioError) {
         console.error(`Podcastify: Failed to generate audio for line ${i + 1}:`, audioError);
         audioGenerationFailed = true;

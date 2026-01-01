@@ -35,50 +35,50 @@ export async function POST(request: NextRequest) {
       input: [
         {
           role: "system",
-          content: `You analyze speech transcriptions to detect user intent. Be helpful - if the user seems to want to learn about a topic or ask a question, help them.
+          content: `You analyze speech transcriptions to detect user intent.
 
 Classify as "question" if:
 - Contains question words: "what", "why", "how", "when", "where", "who", "can you", "could you", "explain", "tell me"
-- Sounds like a question directed at an assistant
-- User wants something explained
+- Is clearly a question directed at an assistant
 
-Classify as "topic" if the user wants to navigate to or learn about a specific topic:
-- Navigation phrases: "go to", "open", "take me to", "show me", "navigate to"
-- Learning intent: "I want to learn about", "expand on", "read more on", "read more about", "elaborate on", "more about", "tell me more about", "learn about", "read about", "look at", "check out"
-- Even simple requests like "network" or "black holes" when said with intent to navigate
-- The user mentions a topic name and seems to want to see it
+Classify as "topic" ONLY if the speech contains an explicit keyword/phrase indicating navigation intent:
+- Required keywords: "go to", "open", "take me to", "show me", "navigate to", "expand on", "read more", "elaborate on", "more about", "tell me more about", "learn about", "read about", "look at", "check out", "I want to learn"
+- The keyword MUST be present - just saying a topic name alone is NOT enough
+- Example: "black holes" alone = ignore, "go to black holes" = topic
 
-Classify as "ignore" ONLY for:
-- Pure filler words: "um", "uh", "like", "so", "anyway"
-- Greetings only: "thank you", "thanks", "okay", "bye", "goodbye", "hello", "hi"
-- Clearly reading article text aloud (long descriptive sentences)
-- Background noise or unintelligible speech
-
-When in doubt between "topic" and "ignore", prefer "topic" if a clear topic name is mentioned.
+Classify as "ignore" (DEFAULT) for:
+- Topic names without navigation keywords (user is just reading aloud)
+- Filler words: "um", "uh", "like", "so", "anyway"
+- Greetings: "thank you", "thanks", "okay", "bye", "goodbye", "hello", "hi"
+- Reading article text aloud (descriptive sentences without commands)
+- Single words or short phrases without explicit intent keywords
+- Background noise or unclear speech
 
 Return ONLY JSON: {"type":"question|topic|ignore","content":"..."}
 - question: include full question
 - topic: include ONLY the topic name (properly capitalized)
 - ignore: empty string ""
 
-Examples of IGNORE:
+Examples of IGNORE (no navigation keyword):
 "thank you" → {"type":"ignore","content":""}
-"um okay so" → {"type":"ignore","content":""}
-"the mitochondria is the powerhouse of the cell and produces ATP through" → {"type":"ignore","content":""}
+"black holes" → {"type":"ignore","content":""}
+"quantum mechanics" → {"type":"ignore","content":""}
+"the network layer handles" → {"type":"ignore","content":""}
+"interesting concept" → {"type":"ignore","content":""}
 
 Examples of QUESTION:
 "What is quantum mechanics?" → {"type":"question","content":"What is quantum mechanics?"}
 "Can you explain photosynthesis?" → {"type":"question","content":"Can you explain photosynthesis?"}
 "Why does this happen?" → {"type":"question","content":"Why does this happen?"}
 
-Examples of TOPIC:
+Examples of TOPIC (has navigation keyword):
 "Go to black holes" → {"type":"topic","content":"Black Holes"}
-"Network" → {"type":"topic","content":"Network"}
 "Read more on quantum entanglement" → {"type":"topic","content":"Quantum Entanglement"}
 "I want to learn about DNA" → {"type":"topic","content":"DNA"}
 "More about photosynthesis" → {"type":"topic","content":"Photosynthesis"}
 "Check out machine learning" → {"type":"topic","content":"Machine Learning"}
-"Black holes" → {"type":"topic","content":"Black Holes"}`,
+"Open the network article" → {"type":"topic","content":"Network"}
+"Expand on relativity" → {"type":"topic","content":"Relativity"}`,
         },
         {
           role: "user",
