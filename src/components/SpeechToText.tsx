@@ -30,6 +30,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
   const speechStartRef = useRef<number | null>(null);
   const hasSpeechRef = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
+  const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Process audio and send to API
   const processAudio = useCallback(async () => {
@@ -178,6 +179,17 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
       
       // Start monitoring
       animationFrameRef.current = requestAnimationFrame(monitorAudio);
+
+      // Keep-alive interval to prevent AudioContext suspension
+      keepAliveIntervalRef.current = setInterval(() => {
+        if (audioContextRef.current?.state === "suspended") {
+          audioContextRef.current.resume();
+        }
+        // Also ensure animation frame is running
+        if (isActiveRef.current && !animationFrameRef.current) {
+          animationFrameRef.current = requestAnimationFrame(monitorAudio);
+        }
+      }, 5000);
     } catch (error) {
       console.error("Failed to start recording:", error);
       alert("Could not access microphone. Please check permissions.");
@@ -189,6 +201,12 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
     // Set inactive first
     setIsActive(false);
     isActiveRef.current = false;
+
+    // Stop keep-alive interval
+    if (keepAliveIntervalRef.current) {
+      clearInterval(keepAliveIntervalRef.current);
+      keepAliveIntervalRef.current = null;
+    }
 
     // Stop animation frame
     if (animationFrameRef.current) {
@@ -224,6 +242,9 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
   useEffect(() => {
     return () => {
       isActiveRef.current = false;
+      if (keepAliveIntervalRef.current) {
+        clearInterval(keepAliveIntervalRef.current);
+      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -247,7 +268,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
   return (
     <button
       onClick={handleClick}
-      className={`toolbar-btn ${isActive ? "recording" : ""}`}
+      className="toolbar-btn"
       aria-label={isActive ? "Stop voice input" : "Voice input"}
       title={isActive ? "Stop voice input" : "Voice input"}
     >
