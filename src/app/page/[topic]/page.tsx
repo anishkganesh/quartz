@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
-import { X, Volume2 } from "lucide-react";
+import { X } from "lucide-react";
 import ArticleHeader from "@/components/ArticleHeader";
 import TableOfContents from "@/components/TableOfContents";
 import FeatureToolbar, { FeatureType } from "@/components/FeatureToolbar";
@@ -10,7 +10,6 @@ import WikiContent from "@/components/WikiContent";
 import SimplifyPanel from "@/components/SimplifyPanel";
 import TikTokPanel from "@/components/TikTokPanel";
 import PodcastPanel, { DialogueLine } from "@/components/PodcastPanel";
-import AudioPlayer from "@/components/AudioPlayer";
 import VideoPanel from "@/components/VideoPanel";
 import QuizPanel, { Question } from "@/components/QuizPanel";
 import ChatPanel from "@/components/ChatPanel";
@@ -62,9 +61,7 @@ export default function WikiPage() {
 
   // Feature panel state
   const [activeFeature, setActiveFeature] = useState<FeatureType>(null);
-  const [, setIsAudioPlaying] = useState(false);
   const [, setIsPodcastPlaying] = useState(false);
-  const [audioInitialized, setAudioInitialized] = useState(false);
   const [podcastInitialized, setPodcastInitialized] = useState(false);
 
   // Cached audio/podcast/quiz/video data - keyed by topic
@@ -93,9 +90,9 @@ export default function WikiPage() {
   const supabase = getSupabaseClient();
   const usageCheckedRef = useRef<Set<string>>(new Set());
 
-  // Inline audio player ref
+  // Inline audio player ref for Audify
   const inlineAudioRef = useRef<HTMLAudioElement | null>(null);
-  const [isLoadingInlineAudio, setIsLoadingInlineAudio] = useState(false);
+  const [isAudioGenerating, setIsAudioGenerating] = useState(false);
 
   // Load content for root panel
   useEffect(() => {
@@ -262,28 +259,25 @@ export default function WikiPage() {
   // Handle concept click - open new panel
   const handleConceptClick = useCallback((concept: string) => {
     const formattedTopic = concept.replace(/\s+/g, "_");
+    const newIndex = panelStack.length; // Get index BEFORE state update
     
-    // Use functional update to get accurate panel index
-    setPanelStack((prev) => {
-      const newIndex = prev.length; // Index where new panel will be
-      const newPanel: PanelState = {
-        topic: formattedTopic,
-        label: concept,
-        content: "",
-        simplifiedContents: {},
-        simplifyLevel: 1,
-      };
-      
-      // Schedule content loading with correct index
-      setTimeout(() => {
-        loadContent(formattedTopic, newIndex);
-      }, 0);
-      
-      return [...prev, newPanel];
-    });
+    const newPanel: PanelState = {
+      topic: formattedTopic,
+      label: concept,
+      content: "",
+      simplifiedContents: {},
+      simplifyLevel: 1,
+    };
+    
+    setPanelStack((prev) => [...prev, newPanel]);
+    
+    // Load content OUTSIDE state setter to avoid double-call in Strict Mode
+    setTimeout(() => {
+      loadContent(formattedTopic, newIndex);
+    }, 0);
 
     addRecentTopic(concept);
-  }, [loadContent, addRecentTopic]);
+  }, [panelStack.length, loadContent, addRecentTopic]);
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback((index: number) => {
@@ -330,23 +324,45 @@ export default function WikiPage() {
   );
 
   // Handle inline audio play
-  const handleInlineAudioPlay = useCallback(async (topic: string, content: string) => {
+  // Handle Audify toggle - play/stop audio inline
+  const handleAudifyToggle = useCallback(async () => {
+    // If audio is playing, stop it
+    if (inlineAudioRef.current && !inlineAudioRef.current.paused) {
+      inlineAudioRef.current.pause();
+      inlineAudioRef.current.currentTime = 0;
+      return;
+    }
+
+    // Get the active panel content
+    const activePanel = panelStack[panelStack.length - 1];
+    if (!activePanel?.content) return;
+
+    // Use simplified content if Simplify panel is open, otherwise use main content
+    const contentToRead = activeFeature === "simplify" 
+      ? (activePanel.simplifiedContents[activePanel.simplifyLevel] || activePanel.content)
+      : activePanel.content;
+    
+    // Create cache key that includes simplify level if applicable
+    const cacheKey = activeFeature === "simplify" 
+      ? `${activePanel.topic}_simplified_${activePanel.simplifyLevel}`
+      : activePanel.topic;
+
     // If already have cached audio, just play it
-    if (cachedAudioUrls[topic]) {
+    if (cachedAudioUrls[cacheKey]) {
       if (inlineAudioRef.current) {
-        inlineAudioRef.current.src = cachedAudioUrls[topic];
+        inlineAudioRef.current.src = cachedAudioUrls[cacheKey];
         inlineAudioRef.current.play();
       }
       return;
     }
 
     // Generate audio
-    setIsLoadingInlineAudio(true);
+    setIsAudioGenerating(true);
     try {
       const response = await fetch("/api/audify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, topic }),
+        body: JSON.stringify({ content: contentToRead, topic: activePanel.topic }),
       });
 
       if (!response.ok) throw new Error("Failed to generate audio");
@@ -355,7 +371,7 @@ export default function WikiPage() {
       const url = URL.createObjectURL(blob);
       
       // Cache the URL
-      setCachedAudioUrls(prev => ({ ...prev, [topic]: url }));
+      setCachedAudioUrls(prev => ({ ...prev, [cacheKey]: url }));
       
       // Play the audio
       if (inlineAudioRef.current) {
@@ -365,10 +381,9 @@ export default function WikiPage() {
     } catch (error) {
       console.error("Failed to play audio:", error);
     } finally {
-      setIsLoadingInlineAudio(false);
+      setIsAudioGenerating(false);
     }
-  }, [cachedAudioUrls]
-  );
+  }, [panelStack, activeFeature, cachedAudioUrls]);
 
   // Handle text selection
   const handleTextSelection = useCallback(() => {
@@ -427,11 +442,6 @@ export default function WikiPage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [handleTextSelection]);
-
-  // Handle audio generation callback
-  const handleAudioGenerated = useCallback((topic: string, url: string) => {
-    setCachedAudioUrls(prev => ({ ...prev, [topic]: url }));
-  }, []);
 
   // Handle podcast generation callback
   const handlePodcastGenerated = useCallback((topic: string, dialogue: DialogueLine[], audioUrl: string | null) => {
@@ -495,19 +505,7 @@ export default function WikiPage() {
                 >
                   <div className="panel-content">
                     <div className="panel-header">
-                      <div className="panel-title-row">
-                        <h1>{toTitleCase(panel.label)}</h1>
-                        {panel.content && (
-                          <button
-                            onClick={() => handleInlineAudioPlay(panel.topic, panel.content)}
-                            className="toolbar-btn inline-audio-btn"
-                            aria-label="Play article audio"
-                            disabled={isLoadingInlineAudio}
-                          >
-                            <Volume2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                      <h1>{toTitleCase(panel.label)}</h1>
                       {hasTwoPanels && isLast && (
                         <button
                           onClick={() => handleClosePanel(panelStack.length - 1)}
@@ -579,7 +577,14 @@ export default function WikiPage() {
         {/* Right Sidebar - Feature Toolbar */}
         <FeatureToolbar
           activeFeature={activeFeature}
-          onFeatureClick={setActiveFeature}
+          onFeatureClick={(feature) => {
+            // Handle Audify specially - play inline without opening panel
+            if (feature === "audio") {
+              handleAudifyToggle();
+              return;
+            }
+            setActiveFeature(feature);
+          }}
           onSpeechQuestion={(question) => {
             setChatInitialMessage(question);
             setActiveFeature("chat");
@@ -627,23 +632,6 @@ export default function WikiPage() {
               onPlayingChange={(playing) => {
                 setIsPodcastPlaying(playing);
                 if (playing) setPodcastInitialized(true);
-              }}
-            />
-          </div>
-        )}
-
-        {/* Audio Player - Keep mounted for persistence */}
-        {(activeFeature === "audio" || audioInitialized) && (
-          <div style={{ display: activeFeature === "audio" ? "block" : "none" }}>
-            <AudioPlayer
-              topic={activePanel.topic}
-              content={activePanel.content}
-              onClose={() => setActiveFeature(null)}
-              cachedAudioUrl={cachedAudioUrls[activePanel.topic]}
-              onAudioGenerated={(url) => handleAudioGenerated(activePanel.topic, url)}
-              onPlayingChange={(playing) => {
-                setIsAudioPlaying(playing);
-                if (playing) setAudioInitialized(true);
               }}
             />
           </div>

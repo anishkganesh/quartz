@@ -28,55 +28,53 @@ interface FeatureToolbarProps {
   onSpeechTopic?: (topic: string) => void;
 }
 
-const features = [
+// Features before mic (Simplify, Audify, Chat)
+const featuresBeforeMic = [
   {
     id: "simplify" as const,
     icon: Sparkles,
     label: "Simplify",
-    description: "Make it simpler",
-    disabled: false,
-  },
-  {
-    id: "tiktok" as const,
-    icon: Video,
-    label: "TikTokify",
-    description: "Short-form script",
-    disabled: true,
-  },
-  {
-    id: "podcast" as const,
-    icon: Radio,
-    label: "Podcastify",
-    description: "Conversation script",
     disabled: false,
   },
   {
     id: "audio" as const,
     icon: Volume2,
     label: "Audify",
-    description: "Listen to article",
-    disabled: false,
-  },
-  {
-    id: "video" as const,
-    icon: Film,
-    label: "Videofy",
-    description: "Video script",
-    disabled: true,
-  },
-  {
-    id: "quiz" as const,
-    icon: Gamepad2,
-    label: "Gamify",
-    description: "Take a quiz",
     disabled: false,
   },
   {
     id: "chat" as const,
     icon: MessageCircle,
     label: "Chat",
-    description: "Ask questions",
     disabled: false,
+  },
+];
+
+// Features after mic (Gamify, Podcastify, TikTokify, Videofy)
+const featuresAfterMic = [
+  {
+    id: "quiz" as const,
+    icon: Gamepad2,
+    label: "Gamify",
+    disabled: false,
+  },
+  {
+    id: "podcast" as const,
+    icon: Radio,
+    label: "Podcastify",
+    disabled: false,
+  },
+  {
+    id: "tiktok" as const,
+    icon: Video,
+    label: "TikTokify",
+    disabled: true,
+  },
+  {
+    id: "video" as const,
+    icon: Film,
+    label: "Videofy",
+    disabled: true,
   },
 ];
 
@@ -86,32 +84,38 @@ export default function FeatureToolbar({
   onSpeechQuestion,
   onSpeechTopic,
 }: FeatureToolbarProps) {
+  const renderButton = (feature: typeof featuresBeforeMic[0]) => {
+    const Icon = feature.icon;
+    const isActive = activeFeature === feature.id;
+
+    return (
+      <button
+        key={feature.id}
+        onClick={() => !feature.disabled && onFeatureClick(isActive ? null : feature.id)}
+        className={`toolbar-btn ${isActive ? "active" : ""} ${feature.disabled ? "disabled" : ""}`}
+        aria-label={feature.label}
+        disabled={feature.disabled}
+      >
+        <Icon className="w-4 h-4" />
+      </button>
+    );
+  };
+
   return (
     <div className="feature-toolbar">
-      {features.map((feature) => {
-        const Icon = feature.icon;
-        const isActive = activeFeature === feature.id;
-
-        return (
-          <button
-            key={feature.id}
-            onClick={() => !feature.disabled && onFeatureClick(isActive ? null : feature.id)}
-            className={`toolbar-btn ${isActive ? "active" : ""} ${feature.disabled ? "disabled" : ""}`}
-            aria-label={feature.label}
-            disabled={feature.disabled}
-          >
-            <Icon className="w-4 h-4" />
-          </button>
-        );
-      })}
+      {/* Simplify, Audify, Chat */}
+      {featuresBeforeMic.map(renderButton)}
       
-      {/* Speech-to-Text Button */}
+      {/* Speech-to-Text Mic Button (after Chat) */}
       {onSpeechQuestion && onSpeechTopic && (
         <SpeechToText
           onQuestion={onSpeechQuestion}
           onTopic={onSpeechTopic}
         />
       )}
+      
+      {/* Gamify, Podcastify, TikTokify, Videofy */}
+      {featuresAfterMic.map(renderButton)}
     </div>
   );
 }
