@@ -45,13 +45,13 @@ export default function FeatureToolbar({
   onSpeechQuestion,
   onSpeechTopic,
 }: FeatureToolbarProps) {
-  const renderButton = (feature: typeof featuresBeforeMic[0]) => {
+  const renderButton = (feature: { id: FeatureType; icon: typeof Sparkles; label: string }) => {
     const Icon = feature.icon;
     const isActive = activeFeature === feature.id;
 
     return (
       <button
-        key={feature.id}
+        key={feature.id as string}
         onClick={() => onFeatureClick(isActive ? null : feature.id)}
         className={`toolbar-btn ${isActive ? "active" : ""}`}
         aria-label={feature.label}

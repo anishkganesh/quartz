@@ -8,9 +8,7 @@ import TableOfContents from "@/components/TableOfContents";
 import FeatureToolbar, { FeatureType } from "@/components/FeatureToolbar";
 import WikiContent from "@/components/WikiContent";
 import SimplifyPanel from "@/components/SimplifyPanel";
-import TikTokPanel from "@/components/TikTokPanel";
 import PodcastPanel, { DialogueLine } from "@/components/PodcastPanel";
-import VideoPanel from "@/components/VideoPanel";
 import QuizPanel, { Question } from "@/components/QuizPanel";
 import ChatPanel from "@/components/ChatPanel";
 import TextSelectionPopup from "@/components/TextSelectionPopup";
@@ -65,11 +63,8 @@ export default function WikiPage() {
   const [podcastInitialized, setPodcastInitialized] = useState(false);
 
   // Cached audio/podcast/quiz/video data - keyed by topic
-  const [cachedAudioUrls, setCachedAudioUrls] = useState<Record<string, string>>({});
   const [cachedPodcastData, setCachedPodcastData] = useState<Record<string, { dialogue: DialogueLine[], audioUrl: string | null }>>({});
   const [cachedQuizData, setCachedQuizData] = useState<Record<string, Question[]>>({});
-  const [cachedTikTokScript, setCachedTikTokScript] = useState<Record<string, string>>({});
-  const [cachedVideoScript, setCachedVideoScript] = useState<Record<string, string>>({});
 
   // Active section for TOC
   const [activeSection, setActiveSection] = useState<string>("");
@@ -90,9 +85,6 @@ export default function WikiPage() {
   const supabase = getSupabaseClient();
   const usageCheckedRef = useRef<Set<string>>(new Set());
 
-  // Inline audio player ref for Audify
-  const inlineAudioRef = useRef<HTMLAudioElement | null>(null);
-  const [isAudioGenerating, setIsAudioGenerating] = useState(false);
 
   // Load content for root panel
   useEffect(() => {
@@ -271,6 +263,9 @@ export default function WikiPage() {
     
     setPanelStack((prev) => [...prev, newPanel]);
     
+    // Update URL to new topic (without full navigation)
+    window.history.pushState({}, "", `/page/${formattedTopic}`);
+    
     // Load content OUTSIDE state setter to avoid double-call in Strict Mode
     setTimeout(() => {
       loadContent(formattedTopic, newIndex);
@@ -281,12 +276,28 @@ export default function WikiPage() {
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback((index: number) => {
-    setPanelStack((prev) => prev.slice(0, index + 1));
+    setPanelStack((prev) => {
+      const newStack = prev.slice(0, index + 1);
+      // Update URL to the topic at this index
+      if (newStack.length > 0) {
+        const topic = newStack[newStack.length - 1].topic;
+        window.history.pushState({}, "", `/page/${topic}`);
+      }
+      return newStack;
+    });
   }, []);
 
   // Handle panel close
   const handleClosePanel = useCallback((index: number) => {
-    setPanelStack((prev) => prev.slice(0, index));
+    setPanelStack((prev) => {
+      const newStack = prev.slice(0, index);
+      // Update URL to the last remaining topic
+      if (newStack.length > 0) {
+        const topic = newStack[newStack.length - 1].topic;
+        window.history.pushState({}, "", `/page/${topic}`);
+      }
+      return newStack;
+    });
   }, []);
 
   // Handle section click (TOC)
@@ -323,13 +334,17 @@ export default function WikiPage() {
     []
   );
 
-  // Handle inline audio play
-  // Handle Audify toggle - play/stop audio inline
-  const handleAudifyToggle = useCallback(async () => {
-    // If audio is playing, stop it
-    if (inlineAudioRef.current && !inlineAudioRef.current.paused) {
-      inlineAudioRef.current.pause();
-      inlineAudioRef.current.currentTime = 0;
+  // Handle Audify toggle - play/stop using Browser Speech Synthesis (instant, free, streaming)
+  const handleAudifyToggle = useCallback(() => {
+    // Check if speech synthesis is available
+    if (!window.speechSynthesis) {
+      console.error("Speech synthesis not supported");
+      return;
+    }
+
+    // If speaking, stop it
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
       return;
     }
 
@@ -341,49 +356,37 @@ export default function WikiPage() {
     const contentToRead = activeFeature === "simplify" 
       ? (activePanel.simplifiedContents[activePanel.simplifyLevel] || activePanel.content)
       : activePanel.content;
+
+    // Clean up the text for speech - remove markdown formatting
+    const cleanText = contentToRead
+      .replace(/\[\[([^\]]+)\]\]/g, "$1") // Remove [[ ]] brackets
+      .replace(/#{1,6}\s*/g, "") // Remove headings markers
+      .replace(/\*\*([^*]+)\*\*/g, "$1") // Remove bold
+      .replace(/\*([^*]+)\*/g, "$1") // Remove italic
+      .replace(/`([^`]+)`/g, "$1") // Remove code
+      .replace(/\$\$[\s\S]*?\$\$/g, "") // Remove block math
+      .replace(/\$[^$]+\$/g, "") // Remove inline math
+      .replace(/\n{2,}/g, ". ") // Convert double newlines to pauses
+      .replace(/\n/g, " ") // Convert single newlines to spaces
+      .trim();
+
+    // Create utterance
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0; // Normal speed
+    utterance.pitch = 1.0; // Normal pitch
     
-    // Create cache key that includes simplify level if applicable
-    const cacheKey = activeFeature === "simplify" 
-      ? `${activePanel.topic}_simplified_${activePanel.simplifyLevel}`
-      : activePanel.topic;
-
-    // If already have cached audio, just play it
-    if (cachedAudioUrls[cacheKey]) {
-      if (inlineAudioRef.current) {
-        inlineAudioRef.current.src = cachedAudioUrls[cacheKey];
-        inlineAudioRef.current.play();
-      }
-      return;
+    // Try to use a good voice (prefer Google voices on Chrome)
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Daniel")
+    ) || voices[0];
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
     }
 
-    // Generate audio
-    setIsAudioGenerating(true);
-    try {
-      const response = await fetch("/api/audify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: contentToRead, topic: activePanel.topic }),
-      });
-
-      if (!response.ok) throw new Error("Failed to generate audio");
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      
-      // Cache the URL
-      setCachedAudioUrls(prev => ({ ...prev, [cacheKey]: url }));
-      
-      // Play the audio
-      if (inlineAudioRef.current) {
-        inlineAudioRef.current.src = url;
-        inlineAudioRef.current.play();
-      }
-    } catch (error) {
-      console.error("Failed to play audio:", error);
-    } finally {
-      setIsAudioGenerating(false);
-    }
-  }, [panelStack, activeFeature, cachedAudioUrls]);
+    // Start speaking
+    window.speechSynthesis.speak(utterance);
+  }, [panelStack, activeFeature]);
 
   // Handle text selection
   const handleTextSelection = useCallback(() => {
@@ -607,16 +610,6 @@ export default function WikiPage() {
           />
         )}
 
-        {activeFeature === "tiktok" && (
-          <TikTokPanel
-            topic={activePanel.topic}
-            content={activePanel.content}
-            onClose={() => setActiveFeature(null)}
-            cachedScript={cachedTikTokScript[activePanel.topic]}
-            onScriptGenerated={(script) => setCachedTikTokScript(prev => ({ ...prev, [activePanel.topic]: script }))}
-          />
-        )}
-
         {/* Podcast Panel - Keep mounted for persistence */}
         {(activeFeature === "podcast" || podcastInitialized) && (
           <div style={{ display: activeFeature === "podcast" ? "block" : "none" }}>
@@ -635,16 +628,6 @@ export default function WikiPage() {
               }}
             />
           </div>
-        )}
-
-        {activeFeature === "video" && (
-          <VideoPanel
-            topic={activePanel.topic}
-            content={activePanel.content}
-            onClose={() => setActiveFeature(null)}
-            cachedScript={cachedVideoScript[activePanel.topic]}
-            onScriptGenerated={(script) => setCachedVideoScript(prev => ({ ...prev, [activePanel.topic]: script }))}
-          />
         )}
 
         {activeFeature === "quiz" && (
@@ -688,8 +671,6 @@ export default function WikiPage() {
           limit={usageInfo.limit}
         />
 
-        {/* Hidden audio element for inline playback */}
-        <audio ref={inlineAudioRef} style={{ display: 'none' }} />
       </div>
     </div>
   );
