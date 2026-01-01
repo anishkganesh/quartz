@@ -258,23 +258,28 @@ export default function WikiPage() {
   // Handle concept click - open new panel
   const handleConceptClick = useCallback((concept: string) => {
     const formattedTopic = concept.replace(/\s+/g, "_");
-    const newPanel: PanelState = {
-      topic: formattedTopic,
-      label: concept,
-      content: "",
-      simplifiedContents: {},
-      simplifyLevel: 1,
-    };
-
-    setPanelStack((prev) => [...prev, newPanel]);
     
-    // Load content for new panel
-    setTimeout(() => {
-      loadContent(formattedTopic, panelStack.length);
-    }, 0);
+    // Use functional update to get accurate panel index
+    setPanelStack((prev) => {
+      const newIndex = prev.length; // Index where new panel will be
+      const newPanel: PanelState = {
+        topic: formattedTopic,
+        label: concept,
+        content: "",
+        simplifiedContents: {},
+        simplifyLevel: 1,
+      };
+      
+      // Schedule content loading with correct index
+      setTimeout(() => {
+        loadContent(formattedTopic, newIndex);
+      }, 0);
+      
+      return [...prev, newPanel];
+    });
 
     addRecentTopic(concept);
-  }, [panelStack.length]);
+  }, [loadContent, addRecentTopic]);
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback((index: number) => {
