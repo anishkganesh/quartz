@@ -1,132 +1,106 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, RefObject } from "react";
 import { X, Play, Pause } from "lucide-react";
 
 interface AudioPlayerProps {
   topic: string;
   content: string;
   onClose: () => void;
-  onPlayingChange?: (isPlaying: boolean) => void;
   cachedAudioUrl?: string | null;
   onAudioGenerated?: (url: string) => void;
+  externalAudioRef?: RefObject<HTMLAudioElement | null>;
+  isGenerating?: boolean;
+  isPlaying?: boolean;
 }
 
 export default function AudioPlayer({
-  topic,
-  content,
   onClose,
-  onPlayingChange,
   cachedAudioUrl,
-  onAudioGenerated,
+  externalAudioRef,
+  isGenerating = false,
+  isPlaying: externalIsPlaying = false,
 }: AudioPlayerProps) {
-  const [audioUrl, setAudioUrl] = useState<string | null>(cachedAudioUrl || null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const hasGeneratedRef = useRef(false);
+  const [currentTime, setCurrentTime] = useState(0);
 
   const speedOptions = [0.5, 1, 1.5, 2];
+  const audioRef = externalAudioRef;
 
-  // Generate audio only if not cached and not already generated
+  // Update progress from external audio element
   useEffect(() => {
-    if (!cachedAudioUrl && !audioUrl && !hasGeneratedRef.current) {
-      hasGeneratedRef.current = true;
-      generateAudio();
-    }
-  }, [cachedAudioUrl, audioUrl]);
+    const audio = audioRef?.current;
+    if (!audio) return;
 
-  // Update local state if cached URL changes
-  useEffect(() => {
-    if (cachedAudioUrl && !audioUrl) {
-      setAudioUrl(cachedAudioUrl);
-    }
-  }, [cachedAudioUrl]);
-
-  useEffect(() => {
-    onPlayingChange?.(isPlaying);
-  }, [isPlaying, onPlayingChange]);
-
-  const generateAudio = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/audify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, content }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate audio");
+    const handleTimeUpdate = () => {
+      const dur = audio.duration;
+      if (dur && !isNaN(dur) && dur > 0) {
+        const prog = (audio.currentTime / dur) * 100;
+        setProgress(isNaN(prog) ? 0 : prog);
+        setCurrentTime(audio.currentTime);
       }
+    };
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setAudioUrl(url);
-      onAudioGenerated?.(url);
-    } catch (err) {
-      setError("Failed to generate audio. Please try again.");
-      console.error(err);
-    } finally {
-      setIsLoading(false);
+    const handleLoadedMetadata = () => {
+      const dur = audio.duration;
+      if (dur && !isNaN(dur)) {
+        setDuration(dur);
+      }
+    };
+
+    const handleEnded = () => {
+      setProgress(0);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("ended", handleEnded);
+
+    // Initialize duration if audio is already loaded
+    if (audio.duration && !isNaN(audio.duration)) {
+      setDuration(audio.duration);
     }
-  };
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("ended", handleEnded);
+    };
+  }, [audioRef, cachedAudioUrl]);
 
   const togglePlayPause = () => {
-    if (!audioRef.current) return;
+    const audio = audioRef?.current;
+    if (!audio || !cachedAudioUrl) return;
 
-    if (isPlaying) {
-      audioRef.current.pause();
+    if (externalIsPlaying) {
+      audio.pause();
     } else {
-      audioRef.current.play();
+      audio.play();
     }
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleTimeUpdate = () => {
-    if (!audioRef.current) return;
-    const dur = audioRef.current.duration;
-    if (dur && !isNaN(dur) && dur > 0) {
-      const currentProgress = (audioRef.current.currentTime / dur) * 100;
-      setProgress(isNaN(currentProgress) ? 0 : currentProgress);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (!audioRef.current) return;
-    const dur = audioRef.current.duration;
-    if (dur && !isNaN(dur)) {
-      setDuration(dur);
-    }
-  };
-
-  const handleEnded = () => {
-    setIsPlaying(false);
-    setProgress(0);
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current || !duration || isNaN(duration)) return;
+    const audio = audioRef?.current;
+    if (!audio || !duration || isNaN(duration)) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const newProgress = (clickX / rect.width) * 100;
     const newTime = (newProgress / 100) * duration;
     if (!isNaN(newTime)) {
-      audioRef.current.currentTime = newTime;
+      audio.currentTime = newTime;
       setProgress(newProgress);
+      setCurrentTime(newTime);
     }
   };
 
   const handleSpeedChange = (speed: number) => {
     setPlaybackSpeed(speed);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = speed;
+    const audio = audioRef?.current;
+    if (audio) {
+      audio.playbackRate = speed;
     }
   };
 
@@ -136,8 +110,6 @@ export default function AudioPlayer({
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
-
-  const currentTime = duration > 0 ? (progress / 100) * duration : 0;
 
   return (
     <div className="feature-panel">
@@ -149,38 +121,17 @@ export default function AudioPlayer({
       </div>
 
       <div className="feature-panel-content">
-        {isLoading ? (
+        {isGenerating && !cachedAudioUrl ? (
           <div className="feature-loading">
             <div className="spinner" />
-            <p className="feature-loading-text">Generating...</p>
+            <p className="feature-loading-text">Generating audio...</p>
           </div>
-        ) : error ? (
-          <div className="text-center py-8">
-            <p className="text-red-500 mb-4">{error}</p>
-            <button
-              onClick={() => {
-                hasGeneratedRef.current = false;
-                generateAudio();
-              }}
-              className="px-4 py-2 bg-accent text-background rounded-lg hover:opacity-90"
-            >
-              Try Again
-            </button>
-          </div>
-        ) : audioUrl ? (
+        ) : cachedAudioUrl ? (
           <div className="audio-player-minimal">
-            <audio
-              ref={audioRef}
-              src={audioUrl}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onEnded={handleEnded}
-            />
-
             {/* Main controls row */}
             <div className="audio-controls-row">
               <button onClick={togglePlayPause} className="audio-play-btn-minimal">
-                {isPlaying ? (
+                {externalIsPlaying ? (
                   <Pause className="w-5 h-5" />
                 ) : (
                   <Play className="w-5 h-5 ml-0.5" />
@@ -217,7 +168,11 @@ export default function AudioPlayer({
               </div>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="feature-loading">
+            <p className="feature-loading-text">Click to generate audio</p>
+          </div>
+        )}
       </div>
     </div>
   );

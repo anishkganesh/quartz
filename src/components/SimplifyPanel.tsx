@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, ArrowDown, Check } from "lucide-react";
+import { X, ArrowDown } from "lucide-react";
 import WikiContent from "./WikiContent";
 
 const LEVELS = [
@@ -149,31 +149,23 @@ export default function SimplifyPanel({
                 {currentLevelInfo.description}
               </span>
             </div>
-            {currentLevel < 5 && (
-              <button
-                onClick={handleSimplify}
-                disabled={isLoading || isStreaming}
-                className="pill-btn text-sm"
-              >
-                {isLoading || isStreaming ? (
-                  <>
-                    <div className="spinner" />
-                    <span>Simplifying...</span>
-                  </>
-                ) : (
-                  <>
-                    <ArrowDown className="w-3 h-3" />
-                    <span>Simplify More</span>
-                  </>
-                )}
-              </button>
-            )}
-            {currentLevel === 5 && (
-              <span className="flex items-center gap-1 text-sm text-green-500">
-                <Check className="w-4 h-4" />
-                Simplest level
-              </span>
-            )}
+            <button
+              onClick={handleSimplify}
+              disabled={isLoading || isStreaming || currentLevel >= 5}
+              className="pill-btn text-sm"
+            >
+              {isLoading || isStreaming ? (
+                <>
+                  <div className="spinner" />
+                  <span>Simplifying...</span>
+                </>
+              ) : (
+                <>
+                  <ArrowDown className="w-3 h-3" />
+                  <span>Simplify More</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 

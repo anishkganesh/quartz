@@ -197,9 +197,10 @@ function renderInlineContent(
   const result: React.ReactNode[] = [];
   let keyIndex = 0;
 
-  // Process the text to handle [[concepts]], **bold**, and LaTeX formulas
-  // Regex to match [[concept]], **bold**, \(...\), $...$, \[...\], or $$...$$
-  const regex = /\[\[([^\]]+)\]\]|\*\*([^*]+)\*\*|\\\((.+?)\\\)|\$\$(.+?)\$\$|\\\[(.+?)\\\]|\$([^$]+)\$/g;
+  // Process the text to handle [[concepts]], **bold**, *italic*, and LaTeX formulas
+  // Regex to match [[concept]], **bold**, *italic*, \(...\), $...$, \[...\], or $$...$$
+  // Note: **bold** must come before *italic* so double asterisks match first
+  const regex = /\[\[([^\]]+)\]\]|\*\*([^*]+)\*\*|\*([^*]+)\*|\\\((.+?)\\\)|\$\$(.+?)\$\$|\\\[(.+?)\\\]|\$([^$]+)\$/g;
   let lastIndex = 0;
   let match;
 
@@ -245,25 +246,27 @@ function renderInlineContent(
         <strong key={`${keyPrefix}-bold-${keyIndex++}`}>{innerContent}</strong>
       );
     } else if (match[3]) {
+      // This is *italic* text - check for concepts inside
+      const italicText = match[3];
+      const innerContent = renderInlineContent(
+        italicText,
+        onConceptClick,
+        `${keyPrefix}-italic-${keyIndex}`
+      );
+      result.push(
+        <em key={`${keyPrefix}-italic-${keyIndex++}`}>{innerContent}</em>
+      );
+    } else if (match[4]) {
       // This is inline LaTeX \(...\)
       result.push(
         <span
           key={`${keyPrefix}-latex-${keyIndex++}`}
           className="latex-inline"
-          dangerouslySetInnerHTML={{ __html: renderLatex(match[3], false) }}
-        />
-      );
-    } else if (match[4]) {
-      // This is display LaTeX $$...$$
-      result.push(
-        <span
-          key={`${keyPrefix}-latex-${keyIndex++}`}
-          className="latex-block"
-          dangerouslySetInnerHTML={{ __html: renderLatex(match[4], true) }}
+          dangerouslySetInnerHTML={{ __html: renderLatex(match[4], false) }}
         />
       );
     } else if (match[5]) {
-      // This is display LaTeX \[...\]
+      // This is display LaTeX $$...$$
       result.push(
         <span
           key={`${keyPrefix}-latex-${keyIndex++}`}
@@ -272,12 +275,21 @@ function renderInlineContent(
         />
       );
     } else if (match[6]) {
+      // This is display LaTeX \[...\]
+      result.push(
+        <span
+          key={`${keyPrefix}-latex-${keyIndex++}`}
+          className="latex-block"
+          dangerouslySetInnerHTML={{ __html: renderLatex(match[6], true) }}
+        />
+      );
+    } else if (match[7]) {
       // This is inline LaTeX $...$
       result.push(
         <span
           key={`${keyPrefix}-latex-${keyIndex++}`}
           className="latex-inline"
-          dangerouslySetInnerHTML={{ __html: renderLatex(match[6], false) }}
+          dangerouslySetInnerHTML={{ __html: renderLatex(match[7], false) }}
         />
       );
     }

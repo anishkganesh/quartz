@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
             ],
             reasoning: { effort: AI_REASONING_EFFORT },
             temperature: 0.8,
-            max_output_tokens: 2500,
+            max_output_tokens: 4000,
             stream: true,
           });
 
@@ -116,8 +116,14 @@ export async function POST(request: NextRequest) {
             safeEnqueue(`data: ${JSON.stringify({ type: "section", content: buffer })}\n\n`);
           }
 
+          // Clean up orphan brackets from the content
+          // Remove trailing [[ or incomplete [[text without closing ]]
+          const cleanedContent = fullContent
+            .replace(/\[\[$/g, '')  // Remove trailing [[
+            .replace(/\[\[(?![^\]]*\]\])[^\[]*$/g, ''); // Remove incomplete [[text at end
+
           // Send completion event with full content
-          safeEnqueue(`data: ${JSON.stringify({ type: "done", content: fullContent })}\n\n`);
+          safeEnqueue(`data: ${JSON.stringify({ type: "done", content: cleanedContent })}\n\n`);
           safeClose();
         } catch (error) {
           console.error("Simplify streaming error:", error);

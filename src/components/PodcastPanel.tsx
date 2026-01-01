@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, RefObject } from "react";
 import { X, Copy, Check, Play, Pause } from "lucide-react";
+
+interface DialogueLine {
+  speaker: "Host" | "Guest";
+  text: string;
+}
 
 interface PodcastPanelProps {
   topic: string;
@@ -10,89 +15,70 @@ interface PodcastPanelProps {
   cachedDialogue?: DialogueLine[];
   cachedAudioUrl?: string | null;
   onPodcastGenerated?: (dialogue: DialogueLine[], audioUrl: string | null) => void;
-  onPlayingChange?: (isPlaying: boolean) => void;
-}
-
-interface DialogueLine {
-  speaker: "Host" | "Guest";
-  text: string;
+  externalAudioRef?: RefObject<HTMLAudioElement | null>;
+  isGenerating?: boolean;
+  isPlaying?: boolean;
 }
 
 export default function PodcastPanel({
-  topic,
-  content,
   onClose,
   cachedDialogue,
   cachedAudioUrl,
-  onPodcastGenerated,
-  onPlayingChange,
+  externalAudioRef,
+  isGenerating = false,
+  isPlaying: externalIsPlaying = false,
 }: PodcastPanelProps) {
-  const [dialogue, setDialogue] = useState<DialogueLine[]>(cachedDialogue || []);
-  const [audioUrl, setAudioUrl] = useState<string | null>(cachedAudioUrl || null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const hasGeneratedRef = useRef(false);
+  const [currentTime, setCurrentTime] = useState(0);
 
   const speedOptions = [0.5, 1, 1.5, 2];
+  const audioRef = externalAudioRef;
+  const dialogue = cachedDialogue || [];
 
-  // Generate podcast only if not cached and not already generated
+  // Update progress from external audio element
   useEffect(() => {
-    if (!cachedDialogue?.length && !dialogue.length && !hasGeneratedRef.current) {
-      hasGeneratedRef.current = true;
-      generatePodcast();
-    }
-  }, [cachedDialogue, dialogue.length]);
+    const audio = audioRef?.current;
+    if (!audio) return;
 
-  // Update local state if cached data changes
-  useEffect(() => {
-    if (cachedDialogue?.length && !dialogue.length) {
-      setDialogue(cachedDialogue);
-    }
-    if (cachedAudioUrl && !audioUrl) {
-      setAudioUrl(cachedAudioUrl);
-    }
-  }, [cachedDialogue, cachedAudioUrl]);
-
-  useEffect(() => {
-    onPlayingChange?.(isPlaying);
-  }, [isPlaying, onPlayingChange]);
-
-  const generatePodcast = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/podcastify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, content }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate podcast");
+    const handleTimeUpdate = () => {
+      const dur = audio.duration;
+      if (dur && !isNaN(dur) && dur > 0) {
+        const prog = (audio.currentTime / dur) * 100;
+        setProgress(isNaN(prog) ? 0 : prog);
+        setCurrentTime(audio.currentTime);
       }
+    };
 
-      const data = await response.json();
-      setDialogue(data.dialogue);
-      
-      if (data.audioUrl) {
-        setAudioUrl(data.audioUrl);
+    const handleLoadedMetadata = () => {
+      const dur = audio.duration;
+      if (dur && !isNaN(dur)) {
+        setDuration(dur);
       }
-      
-      onPodcastGenerated?.(data.dialogue, data.audioUrl || null);
-    } catch (err) {
-      setError("Failed to generate podcast. Please try again.");
-      console.error(err);
-    } finally {
-      setIsLoading(false);
+    };
+
+    const handleEnded = () => {
+      setProgress(0);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("ended", handleEnded);
+
+    // Initialize duration if audio is already loaded
+    if (audio.duration && !isNaN(audio.duration)) {
+      setDuration(audio.duration);
     }
-  };
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("ended", handleEnded);
+    };
+  }, [audioRef, cachedAudioUrl]);
 
   const handleCopy = async () => {
     const text = dialogue
@@ -104,54 +90,35 @@ export default function PodcastPanel({
   };
 
   const togglePlayPause = () => {
-    if (!audioRef.current) return;
+    const audio = audioRef?.current;
+    if (!audio || !cachedAudioUrl) return;
 
-    if (isPlaying) {
-      audioRef.current.pause();
+    if (externalIsPlaying) {
+      audio.pause();
     } else {
-      audioRef.current.play();
+      audio.play();
     }
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleTimeUpdate = () => {
-    if (!audioRef.current) return;
-    const dur = audioRef.current.duration;
-    if (dur && !isNaN(dur) && dur > 0) {
-      const currentProgress = (audioRef.current.currentTime / dur) * 100;
-      setProgress(isNaN(currentProgress) ? 0 : currentProgress);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (!audioRef.current) return;
-    const dur = audioRef.current.duration;
-    if (dur && !isNaN(dur)) {
-      setDuration(dur);
-    }
-  };
-
-  const handleEnded = () => {
-    setIsPlaying(false);
-    setProgress(0);
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!audioRef.current || !duration || isNaN(duration)) return;
+    const audio = audioRef?.current;
+    if (!audio || !duration || isNaN(duration)) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const newProgress = (clickX / rect.width) * 100;
     const newTime = (newProgress / 100) * duration;
     if (!isNaN(newTime)) {
-      audioRef.current.currentTime = newTime;
+      audio.currentTime = newTime;
       setProgress(newProgress);
+      setCurrentTime(newTime);
     }
   };
 
   const handleSpeedChange = (speed: number) => {
     setPlaybackSpeed(speed);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = speed;
+    const audio = audioRef?.current;
+    if (audio) {
+      audio.playbackRate = speed;
     }
   };
 
@@ -161,8 +128,6 @@ export default function PodcastPanel({
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
-
-  const currentTime = duration > 0 ? (progress / 100) * duration : 0;
 
   return (
     <div className="feature-panel">
@@ -174,40 +139,19 @@ export default function PodcastPanel({
       </div>
 
       <div className="feature-panel-content">
-        {isLoading ? (
+        {isGenerating && !cachedAudioUrl ? (
           <div className="feature-loading">
             <div className="spinner" />
-            <p className="feature-loading-text">Generating...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-8">
-            <p className="text-red-500 mb-4">{error}</p>
-            <button
-              onClick={() => {
-                hasGeneratedRef.current = false;
-                generatePodcast();
-              }}
-              className="px-4 py-2 bg-accent text-background rounded-full hover:opacity-90"
-            >
-              Try Again
-            </button>
+            <p className="feature-loading-text">Generating podcast...</p>
           </div>
         ) : (
           <>
             {/* Audio Player - Minimal */}
-            {audioUrl && (
+            {cachedAudioUrl && (
               <div className="audio-player-minimal mb-4">
-                <audio
-                  ref={audioRef}
-                  src={audioUrl}
-                  onTimeUpdate={handleTimeUpdate}
-                  onLoadedMetadata={handleLoadedMetadata}
-                  onEnded={handleEnded}
-                />
-
                 <div className="audio-controls-row">
                   <button onClick={togglePlayPause} className="audio-play-btn-minimal">
-                    {isPlaying ? (
+                    {externalIsPlaying ? (
                       <Pause className="w-5 h-5" />
                     ) : (
                       <Play className="w-5 h-5 ml-0.5" />
@@ -278,6 +222,13 @@ export default function PodcastPanel({
                     <span className="text-foreground">{line.text}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Show message if no content yet */}
+            {!cachedAudioUrl && dialogue.length === 0 && !isGenerating && (
+              <div className="feature-loading">
+                <p className="feature-loading-text">Click to generate podcast</p>
               </div>
             )}
           </>

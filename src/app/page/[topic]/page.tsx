@@ -60,13 +60,20 @@ export default function WikiPage() {
 
   // Feature panel state
   const [activeFeature, setActiveFeature] = useState<FeatureType>(null);
-  const [, setIsPodcastPlaying] = useState(false);
-  const [podcastInitialized, setPodcastInitialized] = useState(false);
 
   // Cached audio/podcast/quiz/video data - keyed by topic
   const [cachedAudioUrls, setCachedAudioUrls] = useState<Record<string, string>>({});
   const [cachedPodcastData, setCachedPodcastData] = useState<Record<string, { dialogue: DialogueLine[], audioUrl: string | null }>>({});
   const [cachedQuizData, setCachedQuizData] = useState<Record<string, Question[]>>({});
+
+  // Page-level audio refs and state for persistent playback
+  const audifyAudioRef = useRef<HTMLAudioElement | null>(null);
+  const podifyAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isAudifyGenerating, setIsAudifyGenerating] = useState(false);
+  const [isPodifyGenerating, setIsPodifyGenerating] = useState(false);
+  const [audifyIsPlaying, setAudifyIsPlaying] = useState(false);
+  const [podifyIsPlaying, setPodifyIsPlaying] = useState(false);
+  const audioGeneratingRef = useRef<Set<string>>(new Set());
 
   // Active section for TOC
   const [activeSection, setActiveSection] = useState<string>("");
@@ -86,12 +93,16 @@ export default function WikiPage() {
   const [usageInfo, setUsageInfo] = useState<{ used: number; limit: number }>({ used: 0, limit: LIMITS.anonymous });
   const supabase = getSupabaseClient();
   const usageCheckedRef = useRef<Set<string>>(new Set());
+  
+  // Track generating topics to prevent double-generation
+  const generatingRef = useRef<Set<string>>(new Set());
 
 
   // Load content for root panel
   useEffect(() => {
     loadContent(rootTopic, 0);
     addRecentTopic(rootLabel);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rootTopic, rootLabel]);
 
   // Update tab title based on active panel
@@ -102,7 +113,69 @@ export default function WikiPage() {
     }
   }, [panelStack]);
 
+  // Background audio generation for Audify
+  const generateAudifyAudio = useCallback(async (topic: string, content: string) => {
+    const cacheKey = `audify-${topic}`;
+    if (audioGeneratingRef.current.has(cacheKey) || cachedAudioUrls[topic]) return;
+    
+    audioGeneratingRef.current.add(cacheKey);
+    setIsAudifyGenerating(true);
+    
+    try {
+      const response = await fetch("/api/audify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, content }),
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        setCachedAudioUrls(prev => ({ ...prev, [topic]: url }));
+      }
+    } catch (err) {
+      console.error("Audify generation failed:", err);
+    } finally {
+      audioGeneratingRef.current.delete(cacheKey);
+      setIsAudifyGenerating(false);
+    }
+  }, [cachedAudioUrls]);
+
+  // Background audio generation for Podify
+  const generatePodifyAudio = useCallback(async (topic: string, content: string) => {
+    const cacheKey = `podify-${topic}`;
+    if (audioGeneratingRef.current.has(cacheKey) || cachedPodcastData[topic]?.audioUrl) return;
+    
+    audioGeneratingRef.current.add(cacheKey);
+    setIsPodifyGenerating(true);
+    
+    try {
+      const response = await fetch("/api/podcastify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, content }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCachedPodcastData(prev => ({ 
+          ...prev, 
+          [topic]: { dialogue: data.dialogue, audioUrl: data.audioUrl } 
+        }));
+      }
+    } catch (err) {
+      console.error("Podify generation failed:", err);
+    } finally {
+      audioGeneratingRef.current.delete(cacheKey);
+      setIsPodifyGenerating(false);
+    }
+  }, [cachedPodcastData]);
+
   const loadContent = async (topic: string, panelIndex: number) => {
+    // Prevent double-generation in Strict Mode
+    if (generatingRef.current.has(topic)) return;
+    generatingRef.current.add(topic);
+    
     setIsLoading(true);
     setIsStreaming(false);
     setError(null);
@@ -120,6 +193,7 @@ export default function WikiPage() {
         return updated;
       });
       setIsLoading(false);
+      generatingRef.current.delete(topic);
       return;
     }
 
@@ -242,11 +316,13 @@ export default function WikiPage() {
       }
 
       setIsStreaming(false);
+      generatingRef.current.delete(topic);
     } catch (err) {
       setError("Failed to load article");
       console.error(err);
       setIsLoading(false);
       setIsStreaming(false);
+      generatingRef.current.delete(topic);
     }
   };
 
@@ -274,7 +350,8 @@ export default function WikiPage() {
     }, 0);
 
     addRecentTopic(concept);
-  }, [panelStack.length, loadContent, addRecentTopic]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelStack.length]);
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback((index: number) => {
@@ -336,10 +413,27 @@ export default function WikiPage() {
     []
   );
 
-  // Handle Audify toggle - open/close the audio panel
+  // Handle Audify toggle - start generation in background and open panel
+  // Only generate audio if article is fully loaded (not streaming or loading)
   const handleAudifyToggle = useCallback(() => {
+    const panel = panelStack[panelStack.length - 1];
+    // Only start generation if article is fully loaded
+    if (panel.content && !isLoading && !isStreaming && !cachedAudioUrls[panel.topic]) {
+      generateAudifyAudio(panel.topic, panel.content);
+    }
     setActiveFeature(prev => prev === "audio" ? null : "audio");
-  }, []);
+  }, [panelStack, cachedAudioUrls, generateAudifyAudio, isLoading, isStreaming]);
+
+  // Handle Podify toggle - start generation in background and open panel
+  // Only generate audio if article is fully loaded (not streaming or loading)
+  const handlePodifyToggle = useCallback(() => {
+    const panel = panelStack[panelStack.length - 1];
+    // Only start generation if article is fully loaded
+    if (panel.content && !isLoading && !isStreaming && !cachedPodcastData[panel.topic]?.audioUrl) {
+      generatePodifyAudio(panel.topic, panel.content);
+    }
+    setActiveFeature(prev => prev === "podcast" ? null : "podcast");
+  }, [panelStack, cachedPodcastData, generatePodifyAudio, isLoading, isStreaming]);
 
   // Handle text selection
   const handleTextSelection = useCallback(() => {
@@ -423,6 +517,22 @@ export default function WikiPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Hidden persistent audio elements - stay mounted for background playback */}
+      <audio
+        ref={audifyAudioRef}
+        src={cachedAudioUrls[activePanel.topic] || ""}
+        onPlay={() => setAudifyIsPlaying(true)}
+        onPause={() => setAudifyIsPlaying(false)}
+        onEnded={() => setAudifyIsPlaying(false)}
+      />
+      <audio
+        ref={podifyAudioRef}
+        src={cachedPodcastData[activePanel.topic]?.audioUrl || ""}
+        onPlay={() => setPodifyIsPlaying(true)}
+        onPause={() => setPodifyIsPlaying(false)}
+        onEnded={() => setPodifyIsPlaying(false)}
+      />
+      
       <ArticleHeader
         breadcrumbs={breadcrumbItems}
         onBreadcrumbNavigate={handleBreadcrumbNavigate}
@@ -534,9 +644,14 @@ export default function WikiPage() {
         <FeatureToolbar
           activeFeature={activeFeature}
           onFeatureClick={(feature) => {
-            // Handle Audify specially - play inline without opening panel
+            // Handle Audify specially - start background generation
             if (feature === "audio") {
               handleAudifyToggle();
+              return;
+            }
+            // Handle Podify specially - start background generation
+            if (feature === "podcast") {
+              handlePodifyToggle();
               return;
             }
             setActiveFeature(feature);
@@ -570,27 +685,26 @@ export default function WikiPage() {
             onClose={() => setActiveFeature(null)}
             cachedAudioUrl={cachedAudioUrls[activePanel.topic]}
             onAudioGenerated={(url) => setCachedAudioUrls(prev => ({ ...prev, [activePanel.topic]: url }))}
+            externalAudioRef={audifyAudioRef}
+            isGenerating={isAudifyGenerating}
+            isPlaying={audifyIsPlaying}
           />
         )}
 
-        {/* Podcast Panel - Keep mounted for persistence */}
-        {(activeFeature === "podcast" || podcastInitialized) && (
-          <div style={{ display: activeFeature === "podcast" ? "block" : "none" }}>
-            <PodcastPanel
-              topic={activePanel.topic}
-              content={activePanel.content}
-              onClose={() => setActiveFeature(null)}
-              cachedDialogue={cachedPodcastData[activePanel.topic]?.dialogue}
-              cachedAudioUrl={cachedPodcastData[activePanel.topic]?.audioUrl}
-              onPodcastGenerated={(dialogue, audioUrl) => {
-                handlePodcastGenerated(activePanel.topic, dialogue, audioUrl);
-              }}
-              onPlayingChange={(playing) => {
-                setIsPodcastPlaying(playing);
-                if (playing) setPodcastInitialized(true);
-              }}
-            />
-          </div>
+        {activeFeature === "podcast" && (
+          <PodcastPanel
+            topic={activePanel.topic}
+            content={activePanel.content}
+            onClose={() => setActiveFeature(null)}
+            cachedDialogue={cachedPodcastData[activePanel.topic]?.dialogue}
+            cachedAudioUrl={cachedPodcastData[activePanel.topic]?.audioUrl}
+            onPodcastGenerated={(dialogue, audioUrl) => {
+              handlePodcastGenerated(activePanel.topic, dialogue, audioUrl);
+            }}
+            externalAudioRef={podifyAudioRef}
+            isGenerating={isPodifyGenerating}
+            isPlaying={podifyIsPlaying}
+          />
         )}
 
         {activeFeature === "quiz" && (

@@ -111,7 +111,7 @@ Example: If writing about UV light, mark [[UVA]], [[UVB]], [[UVC]], [[sunscreen]
             ],
             reasoning: { effort: AI_REASONING_EFFORT },
             temperature: 0.7,
-            max_output_tokens: 2500,
+            max_output_tokens: 4000,
             stream: true,
           });
 
@@ -154,8 +154,14 @@ Example: If writing about UV light, mark [[UVA]], [[UVB]], [[UVC]], [[sunscreen]
             safeEnqueue(`data: ${JSON.stringify({ type: "section", content: buffer })}\n\n`);
           }
 
+          // Clean up orphan brackets from the content
+          // Remove trailing [[ or incomplete [[text without closing ]]
+          const cleanedContent = fullContent
+            .replace(/\[\[$/g, '')  // Remove trailing [[
+            .replace(/\[\[(?![^\]]*\]\])[^\[]*$/g, ''); // Remove incomplete [[text at end
+
           // Send completion event with full content for caching
-          safeEnqueue(`data: ${JSON.stringify({ type: "done", content: fullContent, topic: cleanTopic })}\n\n`);
+          safeEnqueue(`data: ${JSON.stringify({ type: "done", content: cleanedContent, topic: cleanTopic })}\n\n`);
           safeClose();
         } catch (error) {
           console.error("Streaming error:", error);
