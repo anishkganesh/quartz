@@ -189,4 +189,6 @@ Guidelines:
 - If asked about something not in the article, provide general knowledge but mention it's not from the article
 - Be friendly and encouraging of curiosity
 - Keep responses focused and to the point (2-3 paragraphs max unless more detail is requested)
-- Use examples and analogies when helpful`;
+- Use examples and analogies when helpful
+- For mathematical formulas, use LaTeX syntax: $inline$ for inline math, $$block$$ for display math
+- Examples: $E = mc^2$, $\\frac{a}{b}$, $$\\int_0^\\infty f(x)dx$$`;

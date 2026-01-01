@@ -100,7 +100,7 @@ export default function SimplifyPanel({
               } else if (data.type === "error") {
                 throw new Error(data.message);
               }
-            } catch (parseError) {
+            } catch {
               // Ignore parse errors for incomplete chunks
             }
           }
