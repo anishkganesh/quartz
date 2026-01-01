@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
-import { textToSpeech, VOICES } from "@/lib/elevenlabs";
+import { textToSpeech, VOICES, ELEVENLABS_API_KEY } from "@/lib/elevenlabs";
 
 export const maxDuration = 120; // 2 minutes for audio generation
 
@@ -95,23 +95,40 @@ Generate 8-10 exchanges (16-20 lines total) to keep audio generation manageable.
 
     console.log(`Podcastify: Parsed ${dialogue.length} dialogue lines`);
 
-    // Step 2: Generate audio for each dialogue line using ElevenLabs
+    // Step 2: Generate audio for each dialogue line
     const audioChunks: Buffer[] = [];
     let audioGenerationFailed = false;
+    const useElevenLabs = !!ELEVENLABS_API_KEY;
 
-    console.log("Podcastify: Starting audio generation with ElevenLabs...");
+    console.log(`Podcastify: Starting audio generation with ${useElevenLabs ? 'ElevenLabs' : 'OpenAI'}...`);
 
     for (let i = 0; i < dialogue.length; i++) {
       const line = dialogue[i];
-      // Use different ElevenLabs voices for Host and Guest
-      const voiceId = line.speaker === "Host" ? VOICES.host : VOICES.guest;
 
       try {
         console.log(`Podcastify: Generating audio ${i + 1}/${dialogue.length} (${line.speaker})`);
-        const audioBuffer = await textToSpeech({
-          text: line.text,
-          voiceId,
-        });
+        
+        let audioBuffer: ArrayBuffer;
+        
+        if (useElevenLabs) {
+          // Use ElevenLabs voices
+          const voiceId = line.speaker === "Host" ? VOICES.host : VOICES.guest;
+          audioBuffer = await textToSpeech({
+            text: line.text,
+            voiceId,
+          });
+        } else {
+          // Fall back to OpenAI TTS
+          const voice = line.speaker === "Host" ? "echo" : "nova";
+          const audioResponse = await openai.audio.speech.create({
+            model: "tts-1",
+            voice: voice,
+            input: line.text,
+            response_format: "mp3",
+          });
+          audioBuffer = await audioResponse.arrayBuffer();
+        }
+        
         audioChunks.push(Buffer.from(audioBuffer));
       } catch (audioError) {
         console.error(`Podcastify: Failed to generate audio for line ${i + 1}:`, audioError);

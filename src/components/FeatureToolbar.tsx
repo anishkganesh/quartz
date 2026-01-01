@@ -2,10 +2,8 @@
 
 import {
   Sparkles,
-  Video,
   Radio,
   Volume2,
-  Film,
   Gamepad2,
   MessageCircle,
 } from "lucide-react";
@@ -30,52 +28,15 @@ interface FeatureToolbarProps {
 
 // Features before mic (Simplify, Audify, Chat)
 const featuresBeforeMic = [
-  {
-    id: "simplify" as const,
-    icon: Sparkles,
-    label: "Simplify",
-    disabled: false,
-  },
-  {
-    id: "audio" as const,
-    icon: Volume2,
-    label: "Audify",
-    disabled: false,
-  },
-  {
-    id: "chat" as const,
-    icon: MessageCircle,
-    label: "Chat",
-    disabled: false,
-  },
+  { id: "simplify" as const, icon: Sparkles, label: "Simplify" },
+  { id: "audio" as const, icon: Volume2, label: "Audify" },
+  { id: "chat" as const, icon: MessageCircle, label: "Chat" },
 ];
 
-// Features after mic (Gamify, Podcastify, TikTokify, Videofy)
+// Features after mic (Gamify, Podcastify)
 const featuresAfterMic = [
-  {
-    id: "quiz" as const,
-    icon: Gamepad2,
-    label: "Gamify",
-    disabled: false,
-  },
-  {
-    id: "podcast" as const,
-    icon: Radio,
-    label: "Podcastify",
-    disabled: false,
-  },
-  {
-    id: "tiktok" as const,
-    icon: Video,
-    label: "TikTokify",
-    disabled: true,
-  },
-  {
-    id: "video" as const,
-    icon: Film,
-    label: "Videofy",
-    disabled: true,
-  },
+  { id: "quiz" as const, icon: Gamepad2, label: "Gamify" },
+  { id: "podcast" as const, icon: Radio, label: "Podcastify" },
 ];
 
 export default function FeatureToolbar({
@@ -91,10 +52,9 @@ export default function FeatureToolbar({
     return (
       <button
         key={feature.id}
-        onClick={() => !feature.disabled && onFeatureClick(isActive ? null : feature.id)}
-        className={`toolbar-btn ${isActive ? "active" : ""} ${feature.disabled ? "disabled" : ""}`}
+        onClick={() => onFeatureClick(isActive ? null : feature.id)}
+        className={`toolbar-btn ${isActive ? "active" : ""}`}
         aria-label={feature.label}
-        disabled={feature.disabled}
       >
         <Icon className="w-4 h-4" />
       </button>

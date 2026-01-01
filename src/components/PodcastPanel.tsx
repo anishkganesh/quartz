@@ -239,7 +239,7 @@ export default function PodcastPanel({
 
                 <div className="flex items-center gap-2 mt-3 text-xs text-foreground-muted">
                   <Volume2 className="w-3 h-3" />
-                  <span>AI voices: Echo (Host) + Nova (Guest)</span>
+                  <span>AI voices powered by ElevenLabs</span>
                 </div>
               </div>
             )}

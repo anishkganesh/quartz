@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { textToSpeech, VOICES } from "@/lib/elevenlabs";
+import { textToSpeech, VOICES, ELEVENLABS_API_KEY } from "@/lib/elevenlabs";
+import { openai } from "@/lib/openai";
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,16 +26,32 @@ export async function POST(request: NextRequest) {
       .replace(/\n{3,}/g, "\n\n") // Normalize line breaks
       .trim();
 
-    // ElevenLabs has a higher character limit, but let's be reasonable
-    if (textToSpeak.length > 10000) {
-      textToSpeak = textToSpeak.slice(0, 10000) + "...";
-    }
+    let audioBuffer: ArrayBuffer;
 
-    // Generate speech using ElevenLabs
-    const audioBuffer = await textToSpeech({
-      text: textToSpeak,
-      voiceId: VOICES.narrator,
-    });
+    // Try ElevenLabs first, fall back to OpenAI if not configured
+    if (ELEVENLABS_API_KEY) {
+      console.log("Audify: Using ElevenLabs TTS");
+      // ElevenLabs has a higher character limit
+      if (textToSpeak.length > 10000) {
+        textToSpeak = textToSpeak.slice(0, 10000) + "...";
+      }
+      audioBuffer = await textToSpeech({
+        text: textToSpeak,
+        voiceId: VOICES.narrator,
+      });
+    } else {
+      console.log("Audify: ElevenLabs not configured, using OpenAI TTS");
+      // OpenAI has a 4096 character limit
+      if (textToSpeak.length > 4000) {
+        textToSpeak = textToSpeak.slice(0, 4000) + "...";
+      }
+      const mp3Response = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: "nova",
+        input: textToSpeak,
+      });
+      audioBuffer = await mp3Response.arrayBuffer();
+    }
 
     // Return the audio as a response
     return new NextResponse(audioBuffer, {
@@ -46,7 +63,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Audify error:", error);
     return NextResponse.json(
-      { error: "Failed to generate audio" },
+      { error: "Failed to generate audio", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }
