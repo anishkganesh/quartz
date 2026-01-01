@@ -195,7 +195,7 @@ export default function PodcastPanel({
               <div className="flex justify-end mb-3">
                 <button
                   onClick={handleCopy}
-                  className="p-2 hover:bg-background-tertiary rounded transition-colors"
+                  className="audio-play-btn-minimal"
                   title="Copy script"
                 >
                   {copied ? (
