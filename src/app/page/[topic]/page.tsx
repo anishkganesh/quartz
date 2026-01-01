@@ -327,6 +327,7 @@ export default function WikiPage() {
       });
     },
     []
+  );
 
   // Handle inline audio play
   const handleInlineAudioPlay = useCallback(async (topic: string, content: string) => {
