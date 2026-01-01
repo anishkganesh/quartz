@@ -8,6 +8,7 @@ import TableOfContents from "@/components/TableOfContents";
 import FeatureToolbar, { FeatureType } from "@/components/FeatureToolbar";
 import WikiContent from "@/components/WikiContent";
 import SimplifyPanel from "@/components/SimplifyPanel";
+import AudioPlayer from "@/components/AudioPlayer";
 import PodcastPanel, { DialogueLine } from "@/components/PodcastPanel";
 import QuizPanel, { Question } from "@/components/QuizPanel";
 import ChatPanel from "@/components/ChatPanel";
@@ -63,6 +64,7 @@ export default function WikiPage() {
   const [podcastInitialized, setPodcastInitialized] = useState(false);
 
   // Cached audio/podcast/quiz/video data - keyed by topic
+  const [cachedAudioUrls, setCachedAudioUrls] = useState<Record<string, string>>({});
   const [cachedPodcastData, setCachedPodcastData] = useState<Record<string, { dialogue: DialogueLine[], audioUrl: string | null }>>({});
   const [cachedQuizData, setCachedQuizData] = useState<Record<string, Question[]>>({});
 
@@ -334,59 +336,10 @@ export default function WikiPage() {
     []
   );
 
-  // Handle Audify toggle - play/stop using Browser Speech Synthesis (instant, free, streaming)
+  // Handle Audify toggle - open/close the audio panel
   const handleAudifyToggle = useCallback(() => {
-    // Check if speech synthesis is available
-    if (!window.speechSynthesis) {
-      console.error("Speech synthesis not supported");
-      return;
-    }
-
-    // If speaking, stop it
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-      return;
-    }
-
-    // Get the active panel content
-    const activePanel = panelStack[panelStack.length - 1];
-    if (!activePanel?.content) return;
-
-    // Use simplified content if Simplify panel is open, otherwise use main content
-    const contentToRead = activeFeature === "simplify" 
-      ? (activePanel.simplifiedContents[activePanel.simplifyLevel] || activePanel.content)
-      : activePanel.content;
-
-    // Clean up the text for speech - remove markdown formatting
-    const cleanText = contentToRead
-      .replace(/\[\[([^\]]+)\]\]/g, "$1") // Remove [[ ]] brackets
-      .replace(/#{1,6}\s*/g, "") // Remove headings markers
-      .replace(/\*\*([^*]+)\*\*/g, "$1") // Remove bold
-      .replace(/\*([^*]+)\*/g, "$1") // Remove italic
-      .replace(/`([^`]+)`/g, "$1") // Remove code
-      .replace(/\$\$[\s\S]*?\$\$/g, "") // Remove block math
-      .replace(/\$[^$]+\$/g, "") // Remove inline math
-      .replace(/\n{2,}/g, ". ") // Convert double newlines to pauses
-      .replace(/\n/g, " ") // Convert single newlines to spaces
-      .trim();
-
-    // Create utterance
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.0; // Normal speed
-    utterance.pitch = 1.0; // Normal pitch
-    
-    // Try to use a good voice (prefer Google voices on Chrome)
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(v => 
-      v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Daniel")
-    ) || voices[0];
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
-
-    // Start speaking
-    window.speechSynthesis.speak(utterance);
-  }, [panelStack, activeFeature]);
+    setActiveFeature(prev => prev === "audio" ? null : "audio");
+  }, []);
 
   // Handle text selection
   const handleTextSelection = useCallback(() => {
@@ -607,6 +560,16 @@ export default function WikiPage() {
             onClose={() => setActiveFeature(null)}
             onConceptClick={handleConceptClick}
             simplifiedContents={activePanel.simplifiedContents}
+          />
+        )}
+
+        {activeFeature === "audio" && (
+          <AudioPlayer
+            topic={activePanel.topic}
+            content={activePanel.content}
+            onClose={() => setActiveFeature(null)}
+            cachedAudioUrl={cachedAudioUrls[activePanel.topic]}
+            onAudioGenerated={(url) => setCachedAudioUrls(prev => ({ ...prev, [activePanel.topic]: url }))}
           />
         )}
 

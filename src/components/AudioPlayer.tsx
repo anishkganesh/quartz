@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Play, Pause, RotateCcw, Volume2 } from "lucide-react";
+import { X, Play, Pause } from "lucide-react";
 
 interface AudioPlayerProps {
   topic: string;
@@ -26,8 +26,11 @@ export default function AudioPlayer({
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasGeneratedRef = useRef(false);
+
+  const speedOptions = [0.5, 1, 1.5, 2];
 
   // Generate audio only if not cached and not already generated
   useEffect(() => {
@@ -120,12 +123,11 @@ export default function AudioPlayer({
     }
   };
 
-  const handleRestart = () => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = 0;
-    setProgress(0);
-    audioRef.current.play();
-    setIsPlaying(true);
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackSpeed(speed);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = speed;
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -166,7 +168,7 @@ export default function AudioPlayer({
             </button>
           </div>
         ) : audioUrl ? (
-          <div className="audio-player">
+          <div className="audio-player-minimal">
             <audio
               ref={audioRef}
               src={audioUrl}
@@ -175,8 +177,9 @@ export default function AudioPlayer({
               onEnded={handleEnded}
             />
 
-            <div className="audio-controls">
-              <button onClick={togglePlayPause} className="audio-play-btn">
+            {/* Main controls row */}
+            <div className="audio-controls-row">
+              <button onClick={togglePlayPause} className="audio-play-btn-minimal">
                 {isPlaying ? (
                   <Pause className="w-5 h-5" />
                 ) : (
@@ -184,34 +187,34 @@ export default function AudioPlayer({
                 )}
               </button>
 
-              <div className="flex-1">
+              <div className="audio-progress-wrapper">
                 <div
-                  className="audio-progress cursor-pointer"
+                  className="audio-progress-minimal cursor-pointer"
                   onClick={handleSeek}
                 >
                   <div
-                    className="audio-progress-bar"
+                    className="audio-progress-bar-minimal"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-xs text-foreground-muted mt-1">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
               </div>
 
-              <button
-                onClick={handleRestart}
-                className="p-2 hover:bg-background-tertiary rounded transition-colors"
-                title="Restart"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-            </div>
+              <span className="audio-time">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
 
-            <div className="flex items-center gap-2 mt-4 text-sm text-foreground-muted">
-              <Volume2 className="w-4 h-4" />
-              <span>AI-generated narration</span>
+              {/* Speed controls */}
+              <div className="audio-speed-controls">
+                {speedOptions.map((speed) => (
+                  <button
+                    key={speed}
+                    onClick={() => handleSpeedChange(speed)}
+                    className={`audio-speed-btn ${playbackSpeed === speed ? "active" : ""}`}
+                  >
+                    {speed}x
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : null}

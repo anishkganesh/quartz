@@ -33,10 +33,10 @@ const featuresBeforeMic = [
   { id: "chat" as const, icon: MessageCircle, label: "Chat" },
 ];
 
-// Features after mic (Gamify, Podcastify)
+// Features after mic (Gamify, Podify)
 const featuresAfterMic = [
   { id: "quiz" as const, icon: Gamepad2, label: "Gamify" },
-  { id: "podcast" as const, icon: Radio, label: "Podcastify" },
+  { id: "podcast" as const, icon: Radio, label: "Podify" },
 ];
 
 export default function FeatureToolbar({
