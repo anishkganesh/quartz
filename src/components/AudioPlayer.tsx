@@ -132,9 +132,9 @@ export default function AudioPlayer({
             <div className="audio-controls-row">
               <button onClick={togglePlayPause} className="audio-play-btn-minimal">
                 {externalIsPlaying ? (
-                  <Pause className="w-5 h-5" />
+                  <Pause className="w-4 h-4" />
                 ) : (
-                  <Play className="w-5 h-5 ml-0.5" />
+                  <Play className="w-4 h-4 ml-0.5" />
                 )}
               </button>
 
