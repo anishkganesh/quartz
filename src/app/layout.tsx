@@ -18,8 +18,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Quartz - AI-Powered Encyclopedia",
-  description: "Infinite knowledge, zero jargon. Click any concept to explore deeper.",
+  title: "Quartz",
+  description: "Learn anything. Simplified.",
   keywords: ["encyclopedia", "learn", "education", "articles", "interactive learning", "knowledge"],
   authors: [{ name: "Quartz" }],
   creator: "Quartz",
@@ -29,8 +29,8 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL("https://tryquartz.wiki"),
   openGraph: {
-    title: "Quartz - AI-Powered Encyclopedia",
-    description: "Infinite knowledge, zero jargon. Click any concept to explore deeper.",
+    title: "Quartz",
+    description: "Learn anything. Simplified.",
     url: "https://tryquartz.wiki",
     siteName: "Quartz",
     type: "website",
@@ -38,8 +38,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Quartz - AI-Powered Encyclopedia",
-    description: "Infinite knowledge, zero jargon. Click any concept to explore deeper.",
+    title: "Quartz",
+    description: "Learn anything. Simplified.",
   },
   robots: {
     index: true,
