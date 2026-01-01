@@ -35,11 +35,16 @@ export default function SimplifyPanel({
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState<string>("");
+  // Track the displayed level separately - updates immediately on click
+  const [displayLevel, setDisplayLevel] = useState(currentLevel);
 
   const handleSimplify = async () => {
-    if (currentLevel >= 5) return;
+    if (displayLevel >= 5) return;
 
-    const nextLevel = currentLevel + 1;
+    const nextLevel = displayLevel + 1;
+    
+    // Update level immediately on click
+    setDisplayLevel(nextLevel);
 
     // Check if already cached
     if (simplifiedContents[nextLevel]) {
@@ -57,7 +62,7 @@ export default function SimplifyPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          content: simplifiedContents[currentLevel] || originalContent,
+          content: simplifiedContents[displayLevel] || originalContent,
           topic,
           targetLevel: LEVELS[nextLevel - 1].name,
         }),
@@ -94,7 +99,7 @@ export default function SimplifyPanel({
                 fullContent += data.content;
                 setStreamingContent(fullContent);
               } else if (data.type === "done") {
-                // Final content
+                // Final content - update parent state
                 onLevelChange(nextLevel, data.content);
                 setStreamingContent("");
               } else if (data.type === "error") {
@@ -113,13 +118,15 @@ export default function SimplifyPanel({
       console.error(err);
       setIsLoading(false);
       setIsStreaming(false);
+      // Revert level on error
+      setDisplayLevel(displayLevel);
     }
   };
 
-  const currentLevelInfo = LEVELS[currentLevel - 1];
+  const currentLevelInfo = LEVELS[displayLevel - 1];
   const displayContent = isStreaming 
     ? streamingContent 
-    : (simplifiedContents[currentLevel] || originalContent);
+    : (simplifiedContents[displayLevel] || originalContent);
 
   return (
     <div className="feature-panel">
@@ -137,7 +144,7 @@ export default function SimplifyPanel({
             {LEVELS.map((level) => (
               <div
                 key={level.id}
-                className={`level-dot ${level.id <= currentLevel ? "active" : ""}`}
+                className={`level-dot ${level.id <= displayLevel ? "active" : ""}`}
                 title={level.name}
               />
             ))}
@@ -151,7 +158,7 @@ export default function SimplifyPanel({
             </div>
             <button
               onClick={handleSimplify}
-              disabled={isLoading || isStreaming || currentLevel >= 5}
+              disabled={isLoading || isStreaming || displayLevel >= 5}
               className="pill-btn text-sm"
             >
               {isLoading || isStreaming ? (
