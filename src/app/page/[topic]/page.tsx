@@ -174,7 +174,6 @@ export default function WikiPage() {
 
       const decoder = new TextDecoder();
       let fullContent = "";
-      let buffer = ""; // Buffer for incomplete SSE messages
 
       // Show streaming state - content is arriving
       setIsLoading(false);
@@ -184,13 +183,8 @@ export default function WikiPage() {
         const { done, value } = await reader.read();
         if (done) break;
 
-        // Append new chunk to buffer
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Process complete lines from buffer
-        const lines = buffer.split("\n");
-        // Keep the last potentially incomplete line in buffer
-        buffer = lines.pop() || "";
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
 
         for (const line of lines) {
           if (line.startsWith("data: ")) {
