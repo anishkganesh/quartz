@@ -10,7 +10,7 @@ interface SpeechToTextProps {
 
 const SILENCE_THRESHOLD = 0.03; // Audio level below this is considered silence
 const SILENCE_DURATION = 1000; // 1 second of silence triggers processing
-const MIN_SPEECH_DURATION = 300; // Minimum speech duration to consider valid
+const MIN_SPEECH_DURATION = 500; // Minimum speech duration for valid WebM audio
 
 export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps) {
   const [isActive, setIsActive] = useState(false);
@@ -39,8 +39,8 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
     const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
     chunksRef.current = []; // Clear for next recording
     
-    // Skip very small audio
-    if (audioBlob.size < 500) return;
+    // Skip audio too small to be valid WebM
+    if (audioBlob.size < 2000) return;
 
     setIsProcessing(true);
     isProcessingRef.current = true;
