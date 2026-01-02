@@ -1569,16 +1569,13 @@ button {
     height: 40px;
   }
   
-  /* Fix skeleton loader positioning on mobile */
+  /* Fix skeleton loader positioning on mobile - match article-content padding */
   .section-skeleton {
-    margin-top: 1rem;
-    margin-left: 0;
-    padding-left: 0;
+    margin-top: 0.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
     width: 100%;
-  }
-  
-  .section-skeleton .skeleton-heading {
-    margin-top: 0;
+    box-sizing: border-box;
   }
   
   /* Panel container adjustments */
