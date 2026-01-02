@@ -8,58 +8,39 @@ interface SpeechToTextProps {
   onTopic: (topic: string) => void;
 }
 
-const SILENCE_THRESHOLD = 0.03; // Audio level below this is considered silence
-const SILENCE_DURATION = 1000; // 1 second of silence triggers processing
-const MIN_SPEECH_DURATION = 500; // Minimum speech duration for valid audio
+const SILENCE_THRESHOLD = 0.01; // Audio level below this is considered silence (lowered for sensitivity)
+const SILENCE_DURATION = 1200; // 1.2 seconds of silence triggers processing
+const MIN_SPEECH_DURATION = 600; // Minimum speech duration for valid audio
+const MIN_BLOB_SIZE = 3000; // Minimum blob size in bytes
 
-// Helper: Write string to DataView
-function writeString(view: DataView, offset: number, string: string) {
-  for (let i = 0; i < string.length; i++) {
-    view.setUint8(offset + i, string.charCodeAt(i));
-  }
-}
+// Common Whisper hallucinations to filter out
+const HALLUCINATION_PHRASES = [
+  "thank you",
+  "thanks for watching",
+  "thanks for listening", 
+  "subscribe",
+  "like and subscribe",
+  "see you next time",
+  "bye",
+  "goodbye",
+  "you",
+];
 
-// Helper: Convert audio blob to WAV format (reliable format for Whisper)
-async function convertToWav(audioBlob: Blob): Promise<Blob> {
-  const audioContext = new AudioContext();
-  const arrayBuffer = await audioBlob.arrayBuffer();
-  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+// Get the best supported audio mimeType
+function getSupportedMimeType(): string {
+  const types = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+  ];
   
-  const numChannels = 1; // Mono
-  const sampleRate = audioBuffer.sampleRate;
-  const bitDepth = 16;
-  const bytesPerSample = bitDepth / 8;
-  const blockAlign = numChannels * bytesPerSample;
-  
-  const samples = audioBuffer.getChannelData(0);
-  const dataLength = samples.length * bytesPerSample;
-  const buffer = new ArrayBuffer(44 + dataLength);
-  const view = new DataView(buffer);
-  
-  // WAV header
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + dataLength, true);
-  writeString(view, 8, 'WAVE');
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM format
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * blockAlign, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitDepth, true);
-  writeString(view, 36, 'data');
-  view.setUint32(40, dataLength, true);
-  
-  // Write audio samples
-  const offset = 44;
-  for (let i = 0; i < samples.length; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(offset + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  for (const type of types) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
   }
-  
-  audioContext.close();
-  return new Blob([buffer], { type: 'audio/wav' });
+  return "audio/webm"; // fallback
 }
 
 export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps) {
@@ -75,6 +56,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const mimeTypeRef = useRef<string>("audio/webm");
   
   const silenceStartRef = useRef<number | null>(null);
   const speechStartRef = useRef<number | null>(null);
@@ -84,45 +66,75 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
 
   // Process audio and send to API
   const processAudio = useCallback(async () => {
+    console.log("[STT] processAudio called, chunks:", chunksRef.current.length);
     if (chunksRef.current.length === 0) return;
     
-    const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
+    const mimeType = mimeTypeRef.current;
+    const audioBlob = new Blob(chunksRef.current, { type: mimeType });
     chunksRef.current = []; // Clear for next recording
     
+    console.log("[STT] Audio blob size:", audioBlob.size, "bytes, type:", mimeType);
+    
     // Skip audio too small to be valid
-    if (audioBlob.size < 2000) return;
+    if (audioBlob.size < MIN_BLOB_SIZE) {
+      console.log("[STT] Skipping - audio too small (need", MIN_BLOB_SIZE, "bytes)");
+      return;
+    }
 
     setIsProcessing(true);
     isProcessingRef.current = true;
 
     try {
-      // Convert to WAV for reliable Whisper compatibility
-      const wavBlob = await convertToWav(audioBlob);
+      // Determine file extension from mimeType
+      let extension = "webm";
+      if (mimeType.includes("ogg")) extension = "ogg";
+      else if (mimeType.includes("mp4")) extension = "mp4";
       
       const formData = new FormData();
-      formData.append("audio", wavBlob, "recording.wav");
+      formData.append("audio", audioBlob, `recording.${extension}`);
 
+      console.log("[STT] Sending to API as", extension, "...");
       const response = await fetch("/api/transcribe", {
         method: "POST",
         body: formData,
       });
 
+      console.log("[STT] API response status:", response.status);
+      
       if (!response.ok) {
-        throw new Error("Transcription failed");
+        const errorText = await response.text();
+        console.error("[STT] API error:", errorText);
+        // Don't throw - just log and continue
+        return;
       }
 
       const data = await response.json();
+      console.log("[STT] API response:", data);
+
+      // Check for Whisper hallucinations
+      const transcript = (data.transcript || "").toLowerCase().trim();
+      const isHallucination = HALLUCINATION_PHRASES.some(phrase => 
+        transcript === phrase || transcript === phrase + "."
+      );
+      
+      if (isHallucination) {
+        console.log("[STT] Filtered hallucination:", transcript);
+        return;
+      }
 
       // Only act if we got meaningful content
       if (data.content && data.content.trim().length > 2) {
+        console.log("[STT] Acting on:", data.type, data.content);
         if (data.type === "question") {
           onQuestion(data.content);
         } else if (data.type === "topic") {
           onTopic(data.content);
         }
+      } else {
+        console.log("[STT] No actionable content");
       }
     } catch (error) {
-      console.error("Processing error:", error);
+      console.error("[STT] Processing error:", error);
     } finally {
       setIsProcessing(false);
       isProcessingRef.current = false;
@@ -151,6 +163,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
       if (!hasSpeechRef.current) {
         hasSpeechRef.current = true;
         speechStartRef.current = now;
+        console.log("[STT] Speech started");
       }
       silenceStartRef.current = null;
     } else {
@@ -169,6 +182,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
         !isProcessingRef.current
       ) {
         // Stop current recording segment and process
+        console.log("[STT] Silence detected after speech, stopping to process...");
         if (mediaRecorderRef.current?.state === "recording") {
           mediaRecorderRef.current.stop();
         }
@@ -182,7 +196,13 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
   // Start recording
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 16000,
+        } 
+      });
       streamRef.current = stream;
 
       // Set up audio analysis
@@ -195,10 +215,13 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
       source.connect(analyser);
       analyserRef.current = analyser;
 
+      // Get best supported mimeType
+      const mimeType = getSupportedMimeType();
+      mimeTypeRef.current = mimeType;
+      console.log("[STT] Using mimeType:", mimeType);
+
       // Set up media recorder
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "audio/webm",
-      });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -219,7 +242,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
             mediaRecorderRef.current.start(100);
             animationFrameRef.current = requestAnimationFrame(monitorAudio);
           } catch (e) {
-            console.error("Failed to restart recording:", e);
+            console.error("[STT] Failed to restart recording:", e);
           }
         }
       };
@@ -228,6 +251,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
       setIsActive(true);
       isActiveRef.current = true;
 
+      console.log("[STT] Starting recording...");
       mediaRecorder.start(100); // Get data every 100ms
       
       // Start monitoring
@@ -239,18 +263,19 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
           audioContextRef.current.resume();
         }
         // Also ensure animation frame is running
-        if (isActiveRef.current && !animationFrameRef.current) {
+        if (isActiveRef.current && !animationFrameRef.current && !isProcessingRef.current) {
           animationFrameRef.current = requestAnimationFrame(monitorAudio);
         }
       }, 5000);
     } catch (error) {
-      console.error("Failed to start recording:", error);
+      console.error("[STT] Failed to start recording:", error);
       alert("Could not access microphone. Please check permissions.");
     }
   }, [processAudio, monitorAudio]);
 
   // Stop recording completely
   const stopRecording = useCallback(() => {
+    console.log("[STT] Stopping recording...");
     // Set inactive first
     setIsActive(false);
     isActiveRef.current = false;
