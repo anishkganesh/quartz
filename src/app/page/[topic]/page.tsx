@@ -328,13 +328,6 @@ export default function WikiPage() {
 
   // Handle concept click - open new panel
   const handleConceptClick = useCallback((concept: string) => {
-    // Block navigation if article is still generating (show paywall)
-    if (isLoading || isStreaming) {
-      setUsageInfo({ used: LIMITS.anonymous, limit: LIMITS.anonymous });
-      setShowPaywall(true);
-      return;
-    }
-    
     const formattedTopic = concept.replace(/\s+/g, "_");
     const newIndex = panelStack.length; // Get index BEFORE state update
     
@@ -358,7 +351,7 @@ export default function WikiPage() {
 
     addRecentTopic(concept);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelStack.length, isLoading, isStreaming]);
+  }, [panelStack.length]);
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback((index: number) => {
