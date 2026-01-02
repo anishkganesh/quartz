@@ -213,8 +213,11 @@ export default function WikiPage() {
           setUsageInfo({ used: LIMITS.anonymous, limit: LIMITS.anonymous });
           setShowPaywall(true);
           setIsLoading(false);
+          generatingRef.current.delete(topic);
           return;
         }
+        // Increment immediately on click (before generation)
+        incrementAnonUsage();
       }
       // Note: Logged-in users are checked server-side in the API
     }
@@ -280,18 +283,6 @@ export default function WikiPage() {
                 // Final content - cache it
                 saveToCache(topic, data.content);
                 usageCheckedRef.current.add(topic);
-                
-                // Increment anonymous usage (skip in dev mode)
-                if (!isDev) {
-                  let currentUser = null;
-                  if (supabase) {
-                    const { data: userData } = await supabase.auth.getUser();
-                    currentUser = userData.user;
-                  }
-                  if (!currentUser) {
-                    incrementAnonUsage();
-                  }
-                }
 
                 // Final update with complete content
                 setPanelStack((prev) => {
