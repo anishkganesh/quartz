@@ -107,7 +107,7 @@ export default function PaywallModal({
         
         <p className="paywall-description">
           {isAnonymous 
-            ? `You've used your free article. Sign in for ${LIMITS.loggedIn} free articles per day, or subscribe for unlimited access.`
+            ? `You've used your ${LIMITS.anonymous} free articles. Sign in for ${LIMITS.loggedIn} free articles per day, or subscribe for unlimited access.`
             : "You've reached your daily limit. Subscribe for unlimited access."
           }
         </p>
