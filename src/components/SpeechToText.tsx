@@ -8,40 +8,9 @@ interface SpeechToTextProps {
   onTopic: (topic: string) => void;
 }
 
-const SILENCE_THRESHOLD = 0.01; // Audio level below this is considered silence (lowered for sensitivity)
-const SILENCE_DURATION = 1200; // 1.2 seconds of silence triggers processing
-const MIN_SPEECH_DURATION = 600; // Minimum speech duration for valid audio
-const MIN_BLOB_SIZE = 3000; // Minimum blob size in bytes
-
-// Common Whisper hallucinations to filter out
-const HALLUCINATION_PHRASES = [
-  "thank you",
-  "thanks for watching",
-  "thanks for listening", 
-  "subscribe",
-  "like and subscribe",
-  "see you next time",
-  "bye",
-  "goodbye",
-  "you",
-];
-
-// Get the best supported audio mimeType
-function getSupportedMimeType(): string {
-  const types = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/ogg;codecs=opus",
-    "audio/mp4",
-  ];
-  
-  for (const type of types) {
-    if (MediaRecorder.isTypeSupported(type)) {
-      return type;
-    }
-  }
-  return "audio/webm"; // fallback
-}
+const SILENCE_THRESHOLD = 0.03; // Audio level below this is considered silence
+const SILENCE_DURATION = 1000; // 1 second of silence triggers processing
+const MIN_SPEECH_DURATION = 300; // Minimum speech duration to consider valid
 
 export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps) {
   const [isActive, setIsActive] = useState(false);
@@ -56,7 +25,6 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const mimeTypeRef = useRef<string>("audio/webm");
   
   const silenceStartRef = useRef<number | null>(null);
   const speechStartRef = useRef<number | null>(null);
@@ -66,75 +34,42 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
 
   // Process audio and send to API
   const processAudio = useCallback(async () => {
-    console.log("[STT] processAudio called, chunks:", chunksRef.current.length);
     if (chunksRef.current.length === 0) return;
     
-    const mimeType = mimeTypeRef.current;
-    const audioBlob = new Blob(chunksRef.current, { type: mimeType });
+    const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
     chunksRef.current = []; // Clear for next recording
     
-    console.log("[STT] Audio blob size:", audioBlob.size, "bytes, type:", mimeType);
-    
-    // Skip audio too small to be valid
-    if (audioBlob.size < MIN_BLOB_SIZE) {
-      console.log("[STT] Skipping - audio too small (need", MIN_BLOB_SIZE, "bytes)");
-      return;
-    }
+    // Skip very small audio
+    if (audioBlob.size < 500) return;
 
     setIsProcessing(true);
     isProcessingRef.current = true;
 
     try {
-      // Determine file extension from mimeType
-      let extension = "webm";
-      if (mimeType.includes("ogg")) extension = "ogg";
-      else if (mimeType.includes("mp4")) extension = "mp4";
-      
       const formData = new FormData();
-      formData.append("audio", audioBlob, `recording.${extension}`);
+      formData.append("audio", audioBlob, "recording.webm");
 
-      console.log("[STT] Sending to API as", extension, "...");
       const response = await fetch("/api/transcribe", {
         method: "POST",
         body: formData,
       });
 
-      console.log("[STT] API response status:", response.status);
-      
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[STT] API error:", errorText);
-        // Don't throw - just log and continue
-        return;
+        throw new Error("Transcription failed");
       }
 
       const data = await response.json();
-      console.log("[STT] API response:", data);
-
-      // Check for Whisper hallucinations
-      const transcript = (data.transcript || "").toLowerCase().trim();
-      const isHallucination = HALLUCINATION_PHRASES.some(phrase => 
-        transcript === phrase || transcript === phrase + "."
-      );
-      
-      if (isHallucination) {
-        console.log("[STT] Filtered hallucination:", transcript);
-        return;
-      }
 
       // Only act if we got meaningful content
       if (data.content && data.content.trim().length > 2) {
-        console.log("[STT] Acting on:", data.type, data.content);
         if (data.type === "question") {
           onQuestion(data.content);
         } else if (data.type === "topic") {
           onTopic(data.content);
         }
-      } else {
-        console.log("[STT] No actionable content");
       }
     } catch (error) {
-      console.error("[STT] Processing error:", error);
+      console.error("Processing error:", error);
     } finally {
       setIsProcessing(false);
       isProcessingRef.current = false;
@@ -163,7 +98,6 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
       if (!hasSpeechRef.current) {
         hasSpeechRef.current = true;
         speechStartRef.current = now;
-        console.log("[STT] Speech started");
       }
       silenceStartRef.current = null;
     } else {
@@ -182,7 +116,6 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
         !isProcessingRef.current
       ) {
         // Stop current recording segment and process
-        console.log("[STT] Silence detected after speech, stopping to process...");
         if (mediaRecorderRef.current?.state === "recording") {
           mediaRecorderRef.current.stop();
         }
@@ -196,13 +129,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
   // Start recording
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 16000,
-        } 
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
       // Set up audio analysis
@@ -215,13 +142,10 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      // Get best supported mimeType
-      const mimeType = getSupportedMimeType();
-      mimeTypeRef.current = mimeType;
-      console.log("[STT] Using mimeType:", mimeType);
-
       // Set up media recorder
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm",
+      });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -242,7 +166,7 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
             mediaRecorderRef.current.start(100);
             animationFrameRef.current = requestAnimationFrame(monitorAudio);
           } catch (e) {
-            console.error("[STT] Failed to restart recording:", e);
+            console.error("Failed to restart recording:", e);
           }
         }
       };
@@ -251,7 +175,6 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
       setIsActive(true);
       isActiveRef.current = true;
 
-      console.log("[STT] Starting recording...");
       mediaRecorder.start(100); // Get data every 100ms
       
       // Start monitoring
@@ -263,19 +186,18 @@ export default function SpeechToText({ onQuestion, onTopic }: SpeechToTextProps)
           audioContextRef.current.resume();
         }
         // Also ensure animation frame is running
-        if (isActiveRef.current && !animationFrameRef.current && !isProcessingRef.current) {
+        if (isActiveRef.current && !animationFrameRef.current) {
           animationFrameRef.current = requestAnimationFrame(monitorAudio);
         }
       }, 5000);
     } catch (error) {
-      console.error("[STT] Failed to start recording:", error);
+      console.error("Failed to start recording:", error);
       alert("Could not access microphone. Please check permissions.");
     }
   }, [processAudio, monitorAudio]);
 
   // Stop recording completely
   const stopRecording = useCallback(() => {
-    console.log("[STT] Stopping recording...");
     // Set inactive first
     setIsActive(false);
     isActiveRef.current = false;

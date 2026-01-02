@@ -13,25 +13,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Audio file received:", audioFile.name, audioFile.type, audioFile.size, "bytes");
-
     // Step 1: Transcribe with Whisper
-    let text: string;
-    try {
-      const transcription = await openai.audio.transcriptions.create({
-        file: audioFile,
-        model: "whisper-1",
-        language: "en",
-      });
-      text = transcription.text.trim();
-      console.log("Whisper transcription:", text || "(empty)");
-    } catch (whisperError) {
-      console.error("Whisper error:", whisperError);
-      return NextResponse.json(
-        { error: "Transcription failed" },
-        { status: 400 }
-      );
-    }
+    const transcription = await openai.audio.transcriptions.create({
+      file: audioFile,
+      model: "whisper-1",
+      language: "en",
+    });
+
+    const text = transcription.text.trim();
 
     if (!text) {
       return NextResponse.json(
