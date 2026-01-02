@@ -1334,6 +1334,27 @@ p {
   margin-bottom: 0.5rem;
 }
 
+.section-skeleton .skeleton-heading {
+  height: 1.5rem;
+  width: 40%;
+  margin-bottom: 1rem;
+}
+
+.section-skeleton .skeleton-line {
+  height: 1rem;
+  width: 100%;
+}
+
+.section-skeleton .skeleton-line-short {
+  height: 1rem;
+  width: 80%;
+}
+
+.section-skeleton .skeleton-line-medium {
+  height: 1rem;
+  width: 75%;
+}
+
 /* ============================================
    UTILITIES
    ============================================ */
@@ -1550,14 +1571,14 @@ button {
   
   /* Fix skeleton loader positioning on mobile */
   .section-skeleton {
-    margin-top: 0.5rem;
+    margin-top: 1rem;
     margin-left: 0;
     padding-left: 0;
+    width: 100%;
   }
   
-  /* Reduce top margin on first skeleton element in mobile */
-  .section-skeleton .skeleton:first-child {
-    margin-top: 1rem !important;
+  .section-skeleton .skeleton-heading {
+    margin-top: 0;
   }
   
   /* Panel container adjustments */

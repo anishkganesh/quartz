@@ -328,6 +328,13 @@ export default function WikiPage() {
 
   // Handle concept click - open new panel
   const handleConceptClick = useCallback((concept: string) => {
+    // Block navigation if article is still generating (show paywall)
+    if (isLoading || isStreaming) {
+      setUsageInfo({ used: LIMITS.anonymous, limit: LIMITS.anonymous });
+      setShowPaywall(true);
+      return;
+    }
+    
     const formattedTopic = concept.replace(/\s+/g, "_");
     const newIndex = panelStack.length; // Get index BEFORE state update
     
@@ -351,7 +358,7 @@ export default function WikiPage() {
 
     addRecentTopic(concept);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelStack.length]);
+  }, [panelStack.length, isLoading, isStreaming]);
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback((index: number) => {
@@ -612,12 +619,12 @@ export default function WikiPage() {
                         {/* Skeleton loader for next section while streaming */}
                         {isStreaming && isLast && (
                           <div className="section-skeleton">
-                            <div className="skeleton h-6 w-2/5 mt-8 mb-4" />
-                            <div className="skeleton h-4 w-full" />
-                            <div className="skeleton h-4 w-full" />
-                            <div className="skeleton h-4 w-4/5" />
-                            <div className="skeleton h-4 w-full" />
-                            <div className="skeleton h-4 w-3/4" />
+                            <div className="skeleton skeleton-heading" />
+                            <div className="skeleton skeleton-line" />
+                            <div className="skeleton skeleton-line" />
+                            <div className="skeleton skeleton-line-short" />
+                            <div className="skeleton skeleton-line" />
+                            <div className="skeleton skeleton-line-medium" />
                           </div>
                         )}
                         {/* Related Questions - only on main panel when not streaming */}

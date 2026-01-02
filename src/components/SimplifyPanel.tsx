@@ -191,12 +191,12 @@ export default function SimplifyPanel({
           {/* Skeleton loader for next section while streaming */}
           {isStreaming && (
             <div className="section-skeleton">
-              <div className="skeleton h-6 w-2/5 mt-8 mb-4" />
-              <div className="skeleton h-4 w-full" />
-              <div className="skeleton h-4 w-full" />
-              <div className="skeleton h-4 w-4/5" />
-              <div className="skeleton h-4 w-full" />
-              <div className="skeleton h-4 w-3/4" />
+              <div className="skeleton skeleton-heading" />
+              <div className="skeleton skeleton-line" />
+              <div className="skeleton skeleton-line" />
+              <div className="skeleton skeleton-line-short" />
+              <div className="skeleton skeleton-line" />
+              <div className="skeleton skeleton-line-medium" />
             </div>
           )}
         </div>
