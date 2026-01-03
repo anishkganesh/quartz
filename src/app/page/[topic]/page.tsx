@@ -197,11 +197,15 @@ export default function WikiPage() {
     if (cached) {
       setPanelStack((prev) => {
         const updated = [...prev];
-        updated[panelIndex] = {
-          ...updated[panelIndex],
-          content: cached.content,
-          simplifiedContents: { 1: cached.content },
-        };
+        // Find the panel with matching topic
+        const targetIndex = updated.findIndex(p => p.topic === topic);
+        if (targetIndex !== -1) {
+          updated[targetIndex] = {
+            ...updated[targetIndex],
+            content: cached.content,
+            simplifiedContents: { 1: cached.content },
+          };
+        }
         return updated;
       });
       setIsLoading(false);
@@ -286,12 +290,14 @@ export default function WikiPage() {
                 // Append section content
                 fullContent += data.content;
                 
-                // Update panel with current content
+                // Update panel with current content - find by topic to avoid index mismatch
                 setPanelStack((prev) => {
                   const updated = [...prev];
-                  if (updated[panelIndex]) {
-                    updated[panelIndex] = {
-                      ...updated[panelIndex],
+                  // Find the panel with matching topic
+                  const targetIndex = updated.findIndex(p => p.topic === topic);
+                  if (targetIndex !== -1) {
+                    updated[targetIndex] = {
+                      ...updated[targetIndex],
                       content: fullContent,
                       simplifiedContents: { 1: fullContent },
                     };
@@ -303,12 +309,14 @@ export default function WikiPage() {
                 saveToCache(topic, data.content);
                 usageCheckedRef.current.add(topic);
 
-                // Final update with complete content
+                // Final update with complete content - find by topic to avoid index mismatch
                 setPanelStack((prev) => {
                   const updated = [...prev];
-                  if (updated[panelIndex]) {
-                    updated[panelIndex] = {
-                      ...updated[panelIndex],
+                  // Find the panel with matching topic
+                  const targetIndex = updated.findIndex(p => p.topic === topic);
+                  if (targetIndex !== -1) {
+                    updated[targetIndex] = {
+                      ...updated[targetIndex],
                       content: data.content,
                       simplifiedContents: { 1: data.content },
                     };
