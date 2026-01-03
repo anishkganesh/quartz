@@ -174,7 +174,7 @@ export default function WikiPage() {
     }
   }, [cachedPodcastData]);
 
-  const loadContent = useCallback(async (topic: string, panelIndex: number) => {
+  const loadContent = useCallback(async (topic: string, _panelIndex: number) => {
     // Abort any previous generation
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
