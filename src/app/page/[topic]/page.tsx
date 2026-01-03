@@ -96,6 +96,9 @@ export default function WikiPage() {
   
   // Track generating topics to prevent double-generation
   const generatingRef = useRef<Set<string>>(new Set());
+  
+  // AbortController for canceling in-flight generations
+  const abortControllerRef = useRef<AbortController | null>(null);
 
 
   // Load content for root panel
@@ -172,8 +175,17 @@ export default function WikiPage() {
   }, [cachedPodcastData]);
 
   const loadContent = async (topic: string, panelIndex: number) => {
-    // Prevent double-generation in Strict Mode
-    if (generatingRef.current.has(topic)) return;
+    // Abort any previous generation
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new AbortController for this generation
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
+    // Clear previous generating state and set new
+    generatingRef.current.clear();
     generatingRef.current.add(topic);
     
     setIsLoading(true);
@@ -227,6 +239,7 @@ export default function WikiPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic }),
+        signal: abortController.signal,
       });
 
       // Check for rate limit (JSON response) - skip in dev mode
@@ -252,6 +265,12 @@ export default function WikiPage() {
       setIsStreaming(true);
 
       while (true) {
+        // Check if aborted
+        if (abortController.signal.aborted) {
+          reader.cancel();
+          return;
+        }
+        
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -309,6 +328,10 @@ export default function WikiPage() {
       setIsStreaming(false);
       generatingRef.current.delete(topic);
     } catch (err) {
+      // Ignore abort errors - these are intentional cancellations
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
       setError("Failed to load article");
       console.error(err);
       setIsLoading(false);
@@ -321,9 +344,6 @@ export default function WikiPage() {
   const handleConceptClick = useCallback((concept: string) => {
     const formattedTopic = concept.replace(/\s+/g, "_");
     const newIndex = panelStack.length; // Get index BEFORE state update
-    
-    // Clear any stale generation state for this topic (fixes speech-to-text bug)
-    generatingRef.current.delete(formattedTopic);
     
     const newPanel: PanelState = {
       topic: formattedTopic,
