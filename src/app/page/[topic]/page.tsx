@@ -103,7 +103,7 @@ export default function WikiPage() {
 
   // Load content for root panel
   useEffect(() => {
-    loadContent(rootTopic, 0);
+    loadContent(rootTopic);
     addRecentTopic(rootLabel);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rootTopic, rootLabel]);
@@ -174,7 +174,7 @@ export default function WikiPage() {
     }
   }, [cachedPodcastData]);
 
-  const loadContent = useCallback(async (topic: string, _panelIndex: number) => {
+  const loadContent = useCallback(async (topic: string) => {
     // Abort any previous generation
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -368,7 +368,7 @@ export default function WikiPage() {
     window.history.pushState({}, "", `/page/${formattedTopic}`);
     
     // Load content directly - AbortController handles any duplicate calls
-    loadContent(formattedTopic, newIndex);
+    loadContent(formattedTopic);
 
     addRecentTopic(concept);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -618,7 +618,7 @@ export default function WikiPage() {
                       <div className="text-center py-16">
                         <p className="text-foreground-muted">{error}</p>
                         <button
-                          onClick={() => loadContent(panel.topic, adjustedIndex)}
+                          onClick={() => loadContent(panel.topic)}
                           className="mt-4 px-4 py-2 rounded-lg hover:shadow-lg transition-shadow"
                         >
                           Try Again
