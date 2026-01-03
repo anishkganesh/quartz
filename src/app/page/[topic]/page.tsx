@@ -322,6 +322,9 @@ export default function WikiPage() {
     const formattedTopic = concept.replace(/\s+/g, "_");
     const newIndex = panelStack.length; // Get index BEFORE state update
     
+    // Clear any stale generation state for this topic (fixes speech-to-text bug)
+    generatingRef.current.delete(formattedTopic);
+    
     const newPanel: PanelState = {
       topic: formattedTopic,
       label: concept,
