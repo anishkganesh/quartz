@@ -174,15 +174,15 @@ export default function WikiPage() {
     }
   }, [cachedPodcastData]);
 
-  const loadContent = async (topic: string, panelIndex: number) => {
+  const loadContent = useCallback(async (topic: string, panelIndex: number) => {
     // Abort any previous generation
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     
     // Create new AbortController for this generation
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     
     // Clear previous generating state and set new
     generatingRef.current.clear();
@@ -239,7 +239,7 @@ export default function WikiPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic }),
-        signal: abortController.signal,
+        signal: controller.signal,
       });
 
       // Check for rate limit (JSON response) - skip in dev mode
@@ -266,7 +266,7 @@ export default function WikiPage() {
 
       while (true) {
         // Check if aborted
-        if (abortController.signal.aborted) {
+        if (controller.signal.aborted) {
           reader.cancel();
           return;
         }
@@ -338,7 +338,8 @@ export default function WikiPage() {
       setIsStreaming(false);
       generatingRef.current.delete(topic);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase]);
 
   // Handle concept click - open new panel
   const handleConceptClick = useCallback((concept: string) => {
@@ -358,14 +359,12 @@ export default function WikiPage() {
     // Update URL to new topic (without full navigation)
     window.history.pushState({}, "", `/page/${formattedTopic}`);
     
-    // Load content OUTSIDE state setter to avoid double-call in Strict Mode
-    setTimeout(() => {
-      loadContent(formattedTopic, newIndex);
-    }, 0);
+    // Load content directly - AbortController handles any duplicate calls
+    loadContent(formattedTopic, newIndex);
 
     addRecentTopic(concept);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelStack.length]);
+  }, [panelStack.length, loadContent]);
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback((index: number) => {
