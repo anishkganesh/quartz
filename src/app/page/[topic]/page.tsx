@@ -352,7 +352,6 @@ export default function WikiPage() {
   // Handle concept click - open new panel
   const handleConceptClick = useCallback((concept: string) => {
     const formattedTopic = concept.replace(/\s+/g, "_");
-    const newIndex = panelStack.length; // Get index BEFORE state update
     
     const newPanel: PanelState = {
       topic: formattedTopic,
@@ -371,8 +370,7 @@ export default function WikiPage() {
     loadContent(formattedTopic);
 
     addRecentTopic(concept);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelStack.length, loadContent]);
+  }, [loadContent]);
 
   // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = useCallback((index: number) => {
