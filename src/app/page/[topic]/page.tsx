@@ -116,6 +116,66 @@ export default function WikiPage() {
     }
   }, [panelStack]);
 
+  // Check localStorage cache when active panel changes (handles returning to partially-loaded articles)
+  useEffect(() => {
+    const activePanel = panelStack[panelStack.length - 1];
+    if (!activePanel) return;
+    
+    const cached = getFromCache(activePanel.topic);
+    if (cached && cached.content && cached.content.length > activePanel.content.length) {
+      // Update panel with cached content (fuller version available)
+      setPanelStack(prev => {
+        const updated = [...prev];
+        const idx = updated.length - 1;
+        if (updated[idx].content.length < cached.content.length) {
+          updated[idx] = { 
+            ...updated[idx], 
+            content: cached.content,
+            simplifiedContents: { 1: cached.content }
+          };
+        }
+        return updated;
+      });
+      // Stop loading states since we have complete content
+      setIsLoading(false);
+      setIsStreaming(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelStack.length]); // Triggers when navigating between panels
+
+  // Periodically poll localStorage while content is streaming/incomplete
+  useEffect(() => {
+    // Only poll if we're currently loading or streaming
+    if (!isStreaming && !isLoading) return;
+    
+    const interval = setInterval(() => {
+      const activePanel = panelStack[panelStack.length - 1];
+      if (!activePanel) return;
+      
+      const cached = getFromCache(activePanel.topic);
+      if (cached && cached.content && cached.content.length > activePanel.content.length) {
+        // Fuller content available in cache - update panel
+        setPanelStack(prev => {
+          const updated = [...prev];
+          const idx = updated.length - 1;
+          if (updated[idx] && updated[idx].content.length < cached.content.length) {
+            updated[idx] = { 
+              ...updated[idx], 
+              content: cached.content,
+              simplifiedContents: { 1: cached.content }
+            };
+          }
+          return updated;
+        });
+        setIsStreaming(false);
+        setIsLoading(false);
+      }
+    }, 2000); // Check every 2 seconds
+    
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStreaming, isLoading, panelStack.length]);
+
   // Background audio generation for Audify
   const generateAudifyAudio = useCallback(async (topic: string, content: string) => {
     const cacheKey = `audify-${topic}`;
