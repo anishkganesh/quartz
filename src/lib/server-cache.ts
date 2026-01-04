@@ -334,3 +334,55 @@ export async function cacheQuizQuestions(
   }
 }
 
+/**
+ * Get cached related questions if valid
+ */
+export async function getCachedRelatedQuestions(
+  topic: string
+): Promise<string[] | null> {
+  try {
+    const supabase = createServiceRoleClient();
+    const normalizedTopic = normalizeTopic(topic);
+    
+    const { data, error } = await supabase
+      .from("quartz_related_questions")
+      .select("questions, created_at")
+      .eq("topic", normalizedTopic)
+      .eq("model_version", CACHE_MODEL_VERSION)
+      .single();
+    
+    if (error || !data) return null;
+    if (!isCacheValid(data.created_at)) return null;
+    
+    return data.questions as string[];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Store related questions in cache
+ */
+export async function cacheRelatedQuestions(
+  topic: string,
+  questions: string[]
+): Promise<void> {
+  try {
+    const supabase = createServiceRoleClient();
+    const normalizedTopic = normalizeTopic(topic);
+    
+    await supabase
+      .from("quartz_related_questions")
+      .upsert({
+        topic: normalizedTopic,
+        questions,
+        model_version: CACHE_MODEL_VERSION,
+        created_at: new Date().toISOString(),
+      }, {
+        onConflict: "topic,model_version",
+      });
+  } catch (err) {
+    console.error("Failed to cache related questions:", err);
+  }
+}
+

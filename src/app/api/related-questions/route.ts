@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
+import { getCachedRelatedQuestions, cacheRelatedQuestions, normalizeTopic } from "@/lib/server-cache";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,6 +11,15 @@ export async function POST(request: NextRequest) {
         { error: "Topic is required" },
         { status: 400 }
       );
+    }
+
+    const normalizedTopicStr = normalizeTopic(topic);
+
+    // Check cache first
+    const cachedQuestions = await getCachedRelatedQuestions(normalizedTopicStr);
+    if (cachedQuestions) {
+      console.log("Related questions: Returning cached questions for", topic);
+      return NextResponse.json({ questions: cachedQuestions, cached: true });
     }
 
     const apiResponse = await openai.responses.create({
@@ -75,7 +85,12 @@ Generate 5 related questions.`,
       }
     }
 
-    return NextResponse.json({ questions: questions.slice(0, 5) });
+    const finalQuestions = questions.slice(0, 5);
+
+    // Cache the questions
+    await cacheRelatedQuestions(normalizedTopicStr, finalQuestions);
+
+    return NextResponse.json({ questions: finalQuestions });
   } catch (error) {
     console.error("Related questions error:", error);
     return NextResponse.json(
@@ -84,4 +99,3 @@ Generate 5 related questions.`,
     );
   }
 }
-
