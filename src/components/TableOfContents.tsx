@@ -44,11 +44,11 @@ export default function TableOfContents({
       const h3Match = trimmed.match(/^###\s+(.+)$/);
 
       if (h2Match) {
-        const text = h2Match[1].replace(/\[\[|\]\]/g, "");
+        const text = h2Match[1].replace(/\[\[|\]\]|\*/g, "");
         const id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         items.push({ id, text, level: 2 });
       } else if (h3Match) {
-        const text = h3Match[1].replace(/\[\[|\]\]/g, "");
+        const text = h3Match[1].replace(/\[\[|\]\]|\*/g, "");
         const id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         items.push({ id, text, level: 3 });
       }
