@@ -171,3 +171,39 @@ export function addRecentTopic(topic: string): void {
     // Ignore errors
   }
 }
+
+// Partial content storage for resuming interrupted generations
+const PARTIAL_PREFIX = "quartz_partial_";
+
+export function savePartialContent(topic: string, content: string): void {
+  if (typeof window === "undefined") return;
+  
+  try {
+    const key = `${PARTIAL_PREFIX}${topic.toLowerCase().replace(/\s+/g, "_")}`;
+    localStorage.setItem(key, content);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function getPartialContent(topic: string): string | null {
+  if (typeof window === "undefined") return null;
+  
+  try {
+    const key = `${PARTIAL_PREFIX}${topic.toLowerCase().replace(/\s+/g, "_")}`;
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+export function clearPartialContent(topic: string): void {
+  if (typeof window === "undefined") return;
+  
+  try {
+    const key = `${PARTIAL_PREFIX}${topic.toLowerCase().replace(/\s+/g, "_")}`;
+    localStorage.removeItem(key);
+  } catch {
+    // Ignore errors
+  }
+}

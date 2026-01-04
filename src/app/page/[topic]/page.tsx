@@ -16,7 +16,7 @@ import TextSelectionPopup from "@/components/TextSelectionPopup";
 import RelatedQuestions from "@/components/RelatedQuestions";
 import PaywallModal from "@/components/PaywallModal";
 import { BreadcrumbItem } from "@/components/Breadcrumbs";
-import { getFromCache, saveToCache, addRecentTopic } from "@/lib/cache";
+import { getFromCache, saveToCache, addRecentTopic, savePartialContent, getPartialContent, clearPartialContent } from "@/lib/cache";
 import { toTitleCase } from "@/lib/utils";
 import { getSupabaseClient } from "@/lib/supabase";
 import { checkAnonLimit, incrementAnonUsage, LIMITS } from "@/lib/client-usage";
@@ -207,6 +207,7 @@ export default function WikiPage() {
                       });
                     } else if (data.type === "done") {
                       const finalContent = data.fullContent || (panel.content + data.content);
+                      clearPartialContent(panel.topic); // Clear any saved partial
                       saveToCache(panel.topic, finalContent);
                       setPanelStack((prev) => {
                         const updated = [...prev];
@@ -373,6 +374,7 @@ export default function WikiPage() {
     const cached = getFromCache(topic);
     if (cached) {
       currentGeneratingTopicRef.current = null;
+      clearPartialContent(topic); // Clear any partial saves since we have full cache
       setPanelStack((prev) => {
         const updated = [...prev];
         // Find the panel with matching topic
@@ -390,6 +392,116 @@ export default function WikiPage() {
       setIsLoading(false);
       generatingRef.current.delete(topic);
       return;
+    }
+
+    // Check for saved partial content from a previous aborted generation
+    const partialContent = getPartialContent(topic);
+    if (partialContent && partialContent.length > 0) {
+      // Set the panel content to the partial content first
+      setPanelStack((prev) => {
+        const updated = [...prev];
+        const targetIndex = updated.findIndex(p => p.topic === topic);
+        if (targetIndex !== -1) {
+          updated[targetIndex] = {
+            ...updated[targetIndex],
+            content: partialContent,
+            simplifiedContents: { 1: partialContent },
+            wasAborted: true, // Mark as aborted so continuation triggers
+          };
+        }
+        return updated;
+      });
+      setIsLoading(false);
+      setIsStreaming(true);
+      
+      // Continue generation from partial content
+      try {
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic, existingContent: partialContent }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) throw new Error("Failed to continue generation");
+
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No reader available");
+
+        const decoder = new TextDecoder();
+        let appendedContent = "";
+
+        while (true) {
+          if (controller.signal.aborted) {
+            reader.cancel();
+            return;
+          }
+          
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.type === "section") {
+                  appendedContent += data.content;
+                  setPanelStack((prev) => {
+                    const updated = [...prev];
+                    const targetIndex = updated.findIndex(p => p.topic === topic);
+                    if (targetIndex !== -1) {
+                      const newContent = partialContent + appendedContent;
+                      updated[targetIndex] = {
+                        ...updated[targetIndex],
+                        content: newContent,
+                        simplifiedContents: { 1: newContent },
+                      };
+                    }
+                    return updated;
+                  });
+                } else if (data.type === "done") {
+                  const finalContent = data.fullContent || (partialContent + data.content);
+                  clearPartialContent(topic); // Clear partial save
+                  saveToCache(topic, finalContent);
+                  currentGeneratingTopicRef.current = null;
+
+                  setPanelStack((prev) => {
+                    const updated = [...prev];
+                    const targetIndex = updated.findIndex(p => p.topic === topic);
+                    if (targetIndex !== -1) {
+                      updated[targetIndex] = {
+                        ...updated[targetIndex],
+                        content: finalContent,
+                        simplifiedContents: { 1: finalContent },
+                        wasAborted: false,
+                      };
+                    }
+                    return updated;
+                  });
+                } else if (data.type === "error") {
+                  throw new Error(data.message);
+                }
+              } catch {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+
+        setIsStreaming(false);
+        generatingRef.current.delete(topic);
+        return;
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
+        console.error("Continue generation failed:", err);
+        // Fall through to fresh generation
+      }
     }
 
     // Check usage limit before generating new content (skip in dev mode)
@@ -485,6 +597,7 @@ export default function WikiPage() {
                 });
               } else if (data.type === "done") {
                 // Final content - cache it
+                clearPartialContent(topic); // Clear any saved partial
                 saveToCache(topic, data.content);
                 usageCheckedRef.current.add(topic);
                 currentGeneratingTopicRef.current = null;
@@ -569,6 +682,13 @@ export default function WikiPage() {
   // Handle panel close
   const handleClosePanel = useCallback((index: number) => {
     setPanelStack((prev) => {
+      // Save partial content if the closing panel has incomplete generation
+      const closingPanel = prev[index];
+      if (closingPanel && closingPanel.content.length > 0 && 
+          (closingPanel.wasAborted || isStreaming)) {
+        savePartialContent(closingPanel.topic, closingPanel.content);
+      }
+      
       const newStack = prev.slice(0, index);
       // Update URL to the last remaining topic
       if (newStack.length > 0) {
@@ -577,7 +697,7 @@ export default function WikiPage() {
       }
       return newStack;
     });
-  }, []);
+  }, [isStreaming]);
 
   // Handle section click (TOC)
   const handleSectionClick = useCallback((id: string) => {
