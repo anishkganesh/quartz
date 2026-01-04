@@ -27,6 +27,7 @@ interface PanelState {
   content: string;
   simplifiedContents: Record<number, string>;
   simplifyLevel: number;
+  wasAborted?: boolean; // Track if generation was interrupted
 }
 
 export default function WikiPage() {
@@ -99,6 +100,9 @@ export default function WikiPage() {
   
   // AbortController for canceling in-flight generations
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Track which topic is currently generating (for abort marking)
+  const currentGeneratingTopicRef = useRef<string | null>(null);
 
 
   // Load content for root panel
@@ -116,11 +120,12 @@ export default function WikiPage() {
     }
   }, [panelStack]);
 
-  // Check localStorage cache when active panel changes (handles returning to partially-loaded articles)
+  // Check localStorage cache when active panel changes, or continue generation if aborted
   useEffect(() => {
     const activePanel = panelStack[panelStack.length - 1];
     if (!activePanel) return;
     
+    // First check if there's a fuller cached version
     const cached = getFromCache(activePanel.topic);
     if (cached && cached.content && cached.content.length > activePanel.content.length) {
       // Update panel with cached content (fuller version available)
@@ -131,7 +136,8 @@ export default function WikiPage() {
           updated[idx] = { 
             ...updated[idx], 
             content: cached.content,
-            simplifiedContents: { 1: cached.content }
+            simplifiedContents: { 1: cached.content },
+            wasAborted: false
           };
         }
         return updated;
@@ -139,6 +145,93 @@ export default function WikiPage() {
       // Stop loading states since we have complete content
       setIsLoading(false);
       setIsStreaming(false);
+      return;
+    }
+    
+    // If panel was aborted and has partial content, continue generation
+    if (activePanel.wasAborted && activePanel.content.length > 0) {
+      // Delay slightly to ensure continueGeneration is available
+      setTimeout(() => {
+        const panel = panelStack[panelStack.length - 1];
+        if (panel?.wasAborted && panel.content.length > 0) {
+          // Call API to continue generation - handled inline since continueGeneration may not be ready
+          fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ topic: panel.topic, existingContent: panel.content }),
+          }).then(async (response) => {
+            if (!response.ok) return;
+            
+            setPanelStack(prev => {
+              const updated = [...prev];
+              const idx = updated.findIndex(p => p.topic === panel.topic);
+              if (idx !== -1) {
+                updated[idx] = { ...updated[idx], wasAborted: false };
+              }
+              return updated;
+            });
+            
+            setIsStreaming(true);
+            const reader = response.body?.getReader();
+            if (!reader) return;
+            
+            const decoder = new TextDecoder();
+            let appendedContent = "";
+            
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              
+              const chunk = decoder.decode(value);
+              const lines = chunk.split("\n");
+              
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    
+                    if (data.type === "section") {
+                      appendedContent += data.content;
+                      setPanelStack((prev) => {
+                        const updated = [...prev];
+                        const targetIndex = updated.findIndex(p => p.topic === panel.topic);
+                        if (targetIndex !== -1) {
+                          const newContent = panel.content + appendedContent;
+                          updated[targetIndex] = {
+                            ...updated[targetIndex],
+                            content: newContent,
+                            simplifiedContents: { 1: newContent },
+                          };
+                        }
+                        return updated;
+                      });
+                    } else if (data.type === "done") {
+                      const finalContent = data.fullContent || (panel.content + data.content);
+                      saveToCache(panel.topic, finalContent);
+                      setPanelStack((prev) => {
+                        const updated = [...prev];
+                        const targetIndex = updated.findIndex(p => p.topic === panel.topic);
+                        if (targetIndex !== -1) {
+                          updated[targetIndex] = {
+                            ...updated[targetIndex],
+                            content: finalContent,
+                            simplifiedContents: { 1: finalContent },
+                            wasAborted: false,
+                          };
+                        }
+                        return updated;
+                      });
+                    }
+                  } catch {
+                    // Ignore parse errors
+                  }
+                }
+              }
+            }
+            setIsStreaming(false);
+          }).catch(console.error);
+        }
+      }, 100);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelStack.length]); // Triggers when navigating between panels
@@ -162,7 +255,8 @@ export default function WikiPage() {
             updated[idx] = { 
               ...updated[idx], 
               content: cached.content,
-              simplifiedContents: { 1: cached.content }
+              simplifiedContents: { 1: cached.content },
+              wasAborted: false
             };
           }
           return updated;
@@ -246,14 +340,26 @@ export default function WikiPage() {
   }, [cachedPodcastData]);
 
   const loadContent = useCallback(async (topic: string) => {
-    // Abort any previous generation
-    if (abortControllerRef.current) {
+    // Abort any previous generation and mark the panel as aborted
+    if (abortControllerRef.current && currentGeneratingTopicRef.current) {
+      const abortedTopic = currentGeneratingTopicRef.current;
       abortControllerRef.current.abort();
+      
+      // Mark the panel that was generating as aborted
+      setPanelStack(prev => {
+        const updated = [...prev];
+        const idx = updated.findIndex(p => p.topic === abortedTopic);
+        if (idx !== -1 && updated[idx].content.length > 0) {
+          updated[idx] = { ...updated[idx], wasAborted: true };
+        }
+        return updated;
+      });
     }
     
     // Create new AbortController for this generation
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    currentGeneratingTopicRef.current = topic;
     
     // Clear previous generating state and set new
     generatingRef.current.clear();
@@ -266,6 +372,7 @@ export default function WikiPage() {
     // Check cache first - cached content doesn't count against limit
     const cached = getFromCache(topic);
     if (cached) {
+      currentGeneratingTopicRef.current = null;
       setPanelStack((prev) => {
         const updated = [...prev];
         // Find the panel with matching topic
@@ -275,6 +382,7 @@ export default function WikiPage() {
             ...updated[targetIndex],
             content: cached.content,
             simplifiedContents: { 1: cached.content },
+            wasAborted: false, // Cached content is complete
           };
         }
         return updated;
@@ -379,6 +487,7 @@ export default function WikiPage() {
                 // Final content - cache it
                 saveToCache(topic, data.content);
                 usageCheckedRef.current.add(topic);
+                currentGeneratingTopicRef.current = null;
 
                 // Final update with complete content - find by topic to avoid index mismatch
                 setPanelStack((prev) => {
@@ -390,6 +499,7 @@ export default function WikiPage() {
                       ...updated[targetIndex],
                       content: data.content,
                       simplifiedContents: { 1: data.content },
+                      wasAborted: false, // Clear aborted flag on completion
                     };
                   }
                   return updated;
