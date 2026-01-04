@@ -162,8 +162,8 @@ export async function POST(request: NextRequest) {
             .replace(/\[\[$/g, '')  // Remove trailing [[
             .replace(/\[\[(?![^\]]*\]\])[^\[]*$/g, ''); // Remove incomplete [[text at end
 
-          // Cache the simplified content (if we have a topic)
-          if (normalizedTopicStr) {
+          // Only cache if streaming completed fully (user didn't cancel)
+          if (!isClosed && normalizedTopicStr) {
             await cacheSimplification(normalizedTopicStr, numericLevel, cleanedContent);
           }
 

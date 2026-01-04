@@ -190,8 +190,10 @@ Example: If writing about UV light, mark [[UVA]], [[UVB]], [[UVC]], [[sunscreen]
             .replace(/\[\[$/g, '')  // Remove trailing [[
             .replace(/\[\[(?![^\]]*\]\])[^\[]*$/g, ''); // Remove incomplete [[text at end
 
-          // Cache the generated content
-          await cacheArticle(normalizedTopic, cleanedContent);
+          // Only cache if streaming completed fully (user didn't cancel)
+          if (!isClosed) {
+            await cacheArticle(normalizedTopic, cleanedContent);
+          }
 
           // Send completion event with full content for caching
           safeEnqueue(`data: ${JSON.stringify({ type: "done", content: cleanedContent, topic: cleanTopic })}\n\n`);

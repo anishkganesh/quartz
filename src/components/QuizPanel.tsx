@@ -38,8 +38,6 @@ export default function QuizPanel({
   const [questionsSinceWrongRetry, setQuestionsSinceWrongRetry] = useState(0);
   // Track how many cached questions we've requested from server
   const [cachedQuestionsIndex, setCachedQuestionsIndex] = useState(0);
-  // Total cached questions available on server
-  const [totalCachedOnServer, setTotalCachedOnServer] = useState<number | null>(null);
   
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -94,11 +92,6 @@ export default function QuizPanel({
       }
 
       const data = await response.json();
-      
-      // Update total cached count from server
-      if (data.totalCached !== undefined) {
-        setTotalCachedOnServer(data.totalCached);
-      }
       
       // Update our index if we got cached questions
       if (data.endIndex !== undefined) {
@@ -219,11 +212,6 @@ export default function QuizPanel({
             <div className="mb-4">
               <span className="text-sm text-foreground-muted">
                 Question {questionCount + 1}
-                {totalCachedOnServer && cachedQuestionsIndex < totalCachedOnServer && (
-                  <span className="ml-2 text-xs opacity-50">
-                    ({cachedQuestionsIndex}/{totalCachedOnServer} cached)
-                  </span>
-                )}
               </span>
             </div>
 
