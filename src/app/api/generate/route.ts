@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { openai, WIKI_SYSTEM_PROMPT, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { checkUsage, incrementUsage } from "@/lib/usage";
+import { getCachedArticle, cacheArticle, normalizeTopic } from "@/lib/server-cache";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -46,6 +47,35 @@ export async function POST(request: NextRequest) {
 
     // Clean up the topic name
     const cleanTopic = topic.replace(/_/g, " ").trim();
+    const normalizedTopic = normalizeTopic(cleanTopic);
+
+    // Check cache first
+    const cachedContent = await getCachedArticle(normalizedTopic);
+    if (cachedContent) {
+      // Return cached content as a stream
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          // Send cached content as sections
+          const sections = cachedContent.split(/(?=\n## )/);
+          for (const section of sections) {
+            if (section.trim()) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "section", content: section })}\n\n`));
+            }
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", content: cachedContent, topic: cleanTopic, cached: true })}\n\n`));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    }
 
     // Increment usage for logged-in users at start of generation (skip in dev mode)
     if (!isDev && user) {
@@ -159,6 +189,9 @@ Example: If writing about UV light, mark [[UVA]], [[UVB]], [[UVC]], [[sunscreen]
           const cleanedContent = fullContent
             .replace(/\[\[$/g, '')  // Remove trailing [[
             .replace(/\[\[(?![^\]]*\]\])[^\[]*$/g, ''); // Remove incomplete [[text at end
+
+          // Cache the generated content
+          await cacheArticle(normalizedTopic, cleanedContent);
 
           // Send completion event with full content for caching
           safeEnqueue(`data: ${JSON.stringify({ type: "done", content: cleanedContent, topic: cleanTopic })}\n\n`);

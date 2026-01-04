@@ -1,8 +1,17 @@
 import { NextRequest } from "next/server";
 import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
+import { getCachedSimplification, cacheSimplification, normalizeTopic } from "@/lib/server-cache";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+// Map level names to numeric levels for caching
+const LEVEL_TO_NUMBER: Record<string, number> = {
+  "College": 2,
+  "High School": 3,
+  "Middle School": 4,
+  "Elementary": 5,
+};
 
 const LEVEL_PROMPTS: Record<string, string> = {
   College: `Rewrite this content for a college undergraduate. Use academic language but explain complex terms. Keep [[concept]] brackets for clickable terms. Maintain the same section structure with ## and ### headings.`,
@@ -33,6 +42,37 @@ export async function POST(request: NextRequest) {
     }
 
     const levelPrompt = LEVEL_PROMPTS[targetLevel] || LEVEL_PROMPTS["Elementary"];
+    const numericLevel = LEVEL_TO_NUMBER[targetLevel] || 5;
+    const normalizedTopicStr = topic ? normalizeTopic(topic) : "";
+
+    // Check cache first (only if we have a topic)
+    if (normalizedTopicStr) {
+      const cachedContent = await getCachedSimplification(normalizedTopicStr, numericLevel);
+      if (cachedContent) {
+        // Return cached content as a stream
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            const sections = cachedContent.split(/(?=\n## )/);
+            for (const section of sections) {
+              if (section.trim()) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "section", content: section })}\n\n`));
+              }
+            }
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", content: cachedContent, cached: true })}\n\n`));
+            controller.close();
+          },
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      }
+    }
 
     const encoder = new TextEncoder();
     let isClosed = false;
@@ -121,6 +161,11 @@ export async function POST(request: NextRequest) {
           const cleanedContent = fullContent
             .replace(/\[\[$/g, '')  // Remove trailing [[
             .replace(/\[\[(?![^\]]*\]\])[^\[]*$/g, ''); // Remove incomplete [[text at end
+
+          // Cache the simplified content (if we have a topic)
+          if (normalizedTopicStr) {
+            await cacheSimplification(normalizedTopicStr, numericLevel, cleanedContent);
+          }
 
           // Send completion event with full content
           safeEnqueue(`data: ${JSON.stringify({ type: "done", content: cleanedContent })}\n\n`);

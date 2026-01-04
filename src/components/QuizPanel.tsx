@@ -36,6 +36,10 @@ export default function QuizPanel({
   const [questionCount, setQuestionCount] = useState(0);
   // Questions since last wrong answer insertion
   const [questionsSinceWrongRetry, setQuestionsSinceWrongRetry] = useState(0);
+  // Track how many cached questions we've requested from server
+  const [cachedQuestionsIndex, setCachedQuestionsIndex] = useState(0);
+  // Total cached questions available on server
+  const [totalCachedOnServer, setTotalCachedOnServer] = useState<number | null>(null);
   
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -58,12 +62,12 @@ export default function QuizPanel({
       setQuestionQueue(questionsWithIds);
       setSeenQuestions(new Set(cachedQuestions.map(q => q.question)));
     } else {
-      generateMoreQuestions(true);
+      generateMoreQuestions(true, 0);
     }
   }, [topic, cachedQuestions]);
 
   // Generate more questions
-  const generateMoreQuestions = useCallback(async (isInitial = false) => {
+  const generateMoreQuestions = useCallback(async (isInitial = false, startIndex?: number) => {
     if (isInitial) {
       setIsLoading(true);
     } else {
@@ -71,11 +75,18 @@ export default function QuizPanel({
     }
     setError(null);
 
+    // Determine the start index for this request
+    const requestStartIndex = startIndex ?? cachedQuestionsIndex;
+
     try {
       const response = await fetch("/api/gamify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, content }),
+        body: JSON.stringify({ 
+          topic, 
+          content,
+          startIndex: requestStartIndex,
+        }),
       });
 
       if (!response.ok) {
@@ -83,6 +94,19 @@ export default function QuizPanel({
       }
 
       const data = await response.json();
+      
+      // Update total cached count from server
+      if (data.totalCached !== undefined) {
+        setTotalCachedOnServer(data.totalCached);
+      }
+      
+      // Update our index if we got cached questions
+      if (data.endIndex !== undefined) {
+        setCachedQuestionsIndex(data.endIndex);
+      } else if (data.fresh) {
+        // Fresh questions beyond cache - don't update index
+      }
+
       const newQuestions: Question[] = data.questions
         .filter((q: Question) => !seenQuestions.has(q.question))
         .map((q: Question, i: number) => ({
@@ -111,7 +135,7 @@ export default function QuizPanel({
       setIsLoading(false);
       setIsGeneratingMore(false);
     }
-  }, [topic, content, seenQuestions, onQuestionsGenerated]);
+  }, [topic, content, seenQuestions, onQuestionsGenerated, cachedQuestionsIndex]);
 
   // Check if we need to generate more questions
   useEffect(() => {
@@ -185,7 +209,7 @@ export default function QuizPanel({
         ) : error ? (
           <div className="text-center py-8">
             <p className="text-red-500 mb-4">{error}</p>
-            <button onClick={() => generateMoreQuestions(true)} className="pill-btn text-sm">
+            <button onClick={() => generateMoreQuestions(true, 0)} className="pill-btn text-sm">
               Try Again
             </button>
           </div>
@@ -195,6 +219,11 @@ export default function QuizPanel({
             <div className="mb-4">
               <span className="text-sm text-foreground-muted">
                 Question {questionCount + 1}
+                {totalCachedOnServer && cachedQuestionsIndex < totalCachedOnServer && (
+                  <span className="ml-2 text-xs opacity-50">
+                    ({cachedQuestionsIndex}/{totalCachedOnServer} cached)
+                  </span>
+                )}
               </span>
             </div>
 

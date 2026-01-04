@@ -132,9 +132,20 @@ export default function WikiPage() {
       });
       
       if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        setCachedAudioUrls(prev => ({ ...prev, [topic]: url }));
+        const contentType = response.headers.get("content-type");
+        
+        // Check if response is JSON (cached or newly cached URL)
+        if (contentType?.includes("application/json")) {
+          const data = await response.json();
+          if (data.audioUrl) {
+            setCachedAudioUrls(prev => ({ ...prev, [topic]: data.audioUrl }));
+          }
+        } else {
+          // Fallback: raw audio blob (when caching failed)
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setCachedAudioUrls(prev => ({ ...prev, [topic]: url }));
+        }
       }
     } catch (err) {
       console.error("Audify generation failed:", err);

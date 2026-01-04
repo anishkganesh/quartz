@@ -1,15 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { openai } from "@/lib/openai";
+import { getCachedAudio, cacheAudio, normalizeTopic } from "@/lib/server-cache";
 
 export async function POST(request: NextRequest) {
   try {
-    const { topic, content } = await request.json();
+    const { topic, content, simplificationLevel = 0 } = await request.json();
 
     if (!topic && !content) {
       return NextResponse.json(
         { error: "Topic or content is required" },
         { status: 400 }
       );
+    }
+
+    const normalizedTopicStr = topic ? normalizeTopic(topic) : "";
+
+    // Check cache first (only if we have a topic)
+    if (normalizedTopicStr) {
+      const cachedAudioUrl = await getCachedAudio(normalizedTopicStr, simplificationLevel);
+      if (cachedAudioUrl) {
+        // Return cached audio URL as JSON (frontend will fetch the URL)
+        return NextResponse.json({ 
+          audioUrl: cachedAudioUrl, 
+          cached: true 
+        });
+      }
     }
 
     // Prepare text for TTS - remove markdown formatting and concept brackets
@@ -38,7 +53,19 @@ export async function POST(request: NextRequest) {
     });
     const audioBuffer = await mp3Response.arrayBuffer();
 
-    // Return the audio as a response
+    // Cache the audio if we have a topic
+    if (normalizedTopicStr) {
+      const cachedUrl = await cacheAudio(normalizedTopicStr, simplificationLevel, audioBuffer);
+      if (cachedUrl) {
+        // Return the cached URL
+        return NextResponse.json({ 
+          audioUrl: cachedUrl, 
+          cached: false 
+        });
+      }
+    }
+
+    // Fallback: Return the audio as a response (not cached)
     return new NextResponse(audioBuffer, {
       headers: {
         "Content-Type": "audio/mpeg",

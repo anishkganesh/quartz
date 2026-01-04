@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { openai, AI_MODEL, AI_REASONING_EFFORT } from "@/lib/openai";
+import { getCachedPodcast, cachePodcast, normalizeTopic } from "@/lib/server-cache";
 
 export const maxDuration = 120; // 2 minutes for audio generation
 
@@ -17,6 +18,26 @@ export async function POST(request: NextRequest) {
         { error: "Topic is required" },
         { status: 400 }
       );
+    }
+
+    const normalizedTopicStr = normalizeTopic(topic);
+
+    // Check cache first
+    const cached = await getCachedPodcast(normalizedTopicStr);
+    if (cached) {
+      console.log("Podcastify: Returning cached podcast");
+      // Parse the cached script back to dialogue format
+      let dialogue: DialogueLine[] = [];
+      try {
+        dialogue = JSON.parse(cached.script);
+      } catch {
+        // If script isn't valid JSON, return as is
+      }
+      return NextResponse.json({
+        dialogue,
+        audioUrl: cached.audioUrl,
+        cached: true,
+      });
     }
 
     console.log("Podcastify: Generating dialogue script...");
@@ -124,14 +145,31 @@ Generate 8-10 exchanges (16-20 lines total) to keep audio generation manageable.
       }
     }
 
-    // If we have audio chunks, combine them
+    // If we have audio chunks, combine them and cache
     let audioUrl: string | null = null;
     if (audioChunks.length > 0) {
       console.log(`Podcastify: Combining ${audioChunks.length} audio chunks...`);
       const combinedAudio = Buffer.concat(audioChunks);
-      const base64Audio = combinedAudio.toString("base64");
-      audioUrl = `data:audio/mp3;base64,${base64Audio}`;
-      console.log("Podcastify: Audio generation complete!");
+      
+      // Cache the podcast (script + audio)
+      const cachedUrl = await cachePodcast(
+        normalizedTopicStr,
+        JSON.stringify(dialogue),
+        combinedAudio.buffer.slice(
+          combinedAudio.byteOffset,
+          combinedAudio.byteOffset + combinedAudio.byteLength
+        )
+      );
+      
+      if (cachedUrl) {
+        audioUrl = cachedUrl;
+        console.log("Podcastify: Audio cached successfully!");
+      } else {
+        // Fallback to base64 if caching failed
+        const base64Audio = combinedAudio.toString("base64");
+        audioUrl = `data:audio/mp3;base64,${base64Audio}`;
+        console.log("Podcastify: Audio generation complete (not cached)");
+      }
     } else {
       console.log("Podcastify: No audio generated");
     }
