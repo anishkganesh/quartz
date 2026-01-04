@@ -90,12 +90,26 @@ export async function POST(request: NextRequest) {
 
     // Build the appropriate prompt based on whether this is a continuation
     const userPrompt = isContinuation
-      ? `Continue this encyclopedia article about "${cleanTopic}" from where it left off. Do NOT repeat any content that already exists. Start writing immediately where the existing content ends.
+      ? `Continue this encyclopedia article about "${cleanTopic}" from where it left off. Do NOT repeat any content that already exists.
 
 EXISTING CONTENT (do not repeat):
 ${existingContent}
 
-CONTINUE FROM HERE - write the remaining sections to complete the article. Keep the same style and continue marking concepts with [[double brackets]].`
+CONTINUE FROM HERE following these requirements:
+1. Continue with remaining ## main sections and ### subsections as needed
+2. Mark ALL educational concepts with [[double brackets]] - be VERY liberal
+3. Use bullet points and numbered lists for clarity
+4. Make it engaging and educational
+
+CONCEPT MARKING - Mark ALL of these:
+- Every abbreviation/acronym (e.g., [[DNA]], [[UVA]], [[NASA]], [[ATP]])
+- Every type/variant/category (if there are types, mark EACH one separately)
+- Every application/use case mentioned
+- Every scientist/researcher/historical figure
+- Every technical term, scientific concept, medical term
+- Both multi-word phrases ([[quantum entanglement]]) and single concepts ([[energy]])
+
+Write the remaining sections to complete the article, maintaining the same style as the existing content.`
       : `Write a comprehensive encyclopedia article about "${cleanTopic}".
 
 Requirements:
