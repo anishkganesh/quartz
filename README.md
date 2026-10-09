@@ -2,7 +2,7 @@
 
 Quartz is an AI learning application that turns a topic into an explorable article and lets readers follow linked concepts, simplify the explanation, ask questions, and generate audio or quizzes.
 
-[Website](https://www.tryquartz.wiki) · [Source](https://github.com/anishkganesh/quartz) · [Demo video](https://www.youtube.com/watch?v=Btb3EwG8fQQ)
+[Website](https://www.tryquartz.wiki) · [Demo video](https://www.youtube.com/watch?v=Btb3EwG8fQQ)
 
 ## Overview
 
