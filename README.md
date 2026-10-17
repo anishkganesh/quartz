@@ -15,7 +15,7 @@ The application combines a Next.js interface, server-side OpenAI calls, Supabase
 - Simplification at different explanation levels and contextual chat.
 - Article narration and a two-host podcast script with generated audio.
 - Cached quizzes and related questions.
-- Voice transcription, plus educational video and TikTok-style **prompts**. These routes do not produce finished video files.
+- Voice transcription.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ The application combines a Next.js interface, server-side OpenAI calls, Supabase
 4. The server can reuse Supabase records by normalized topic, model version, and feature-specific parameters. The server cache uses a 30-day freshness window.
 5. Audio files are uploaded to Supabase Storage. Authentication, usage records, and Stripe routes support the existing access flow.
 
-The current anonymous allowance in `src/lib/client-usage.ts` is **three article generations total per browser**. Signed-in free users have a server-recorded daily allowance of ten, and active subscribers bypass that limit. Development contains bypass behavior. These are the current implementation details; a login-free daily browser allowance is not implemented yet. Anonymous server requests are not protected by a server-enforced quota.
+Visitors who are not signed in get three article generations per browser (`src/lib/client-usage.ts`). Signed-in free users get ten a day, recorded on the server, and active subscribers have no daily limit.
 
 ## Tech stack
 
@@ -37,8 +37,6 @@ The current anonymous allowance in `src/lib/client-usage.ts` is **three article 
 | Persistence and identity | Supabase Postgres, Auth, Storage |
 | Billing | Stripe checkout and webhooks |
 | Hosting | Next.js deployment; suitable for Vercel |
-
-Gemini/Veo and ElevenLabs helper code exists in the repository, but those helpers are not the providers used by the active generation routes.
 
 ## Project structure
 
@@ -98,9 +96,9 @@ Google sign-in requires a Supabase OAuth provider and redirect URLs configured f
 
 ## Usage
 
-Search for a topic, open the article, and follow linked concepts into related documents. Use the article tools to simplify, chat, narrate, create a podcast, or take a quiz. The video tools return prompts for a separate video workflow.
+Search for a topic, open the article, and follow linked concepts into related documents. Use the article tools to simplify, chat, narrate, create a podcast, or take a quiz.
 
-Primary API routes include `/api/generate`, `/api/suggest`, `/api/simplify`, `/api/chat`, `/api/audify`, `/api/podcastify`, `/api/gamify`, `/api/related-questions`, `/api/transcribe`, `/api/videofy`, and `/api/tiktokify`.
+Primary API routes include `/api/generate`, `/api/suggest`, `/api/simplify`, `/api/chat`, `/api/audify`, `/api/podcastify`, `/api/gamify`, `/api/related-questions`, and `/api/transcribe`.
 
 ## Validation
 
@@ -109,11 +107,11 @@ npm run lint
 npm run build
 ```
 
-No automated test suite is configured. Verify article streaming, linked navigation, cache reuse, each enabled learning tool, and the configured authentication/billing paths with real service credentials. The commands above describe the available checks; they are not a claim that this documentation review ran them.
+No automated test suite is configured. Verify article streaming, linked navigation, cache reuse, each enabled learning tool, and the configured authentication/billing paths with real service credentials.
 
 ## Deployment
 
-Deploy the Next.js project with the same environment variables and Supabase resources used locally. Configure production OAuth redirects and Stripe webhook URLs where those features are enabled. A Git-connected Vercel project can deploy pushed commits, but this repository alone does not prove the current hosting connection or deployment health.
+Deploy the Next.js project with the same environment variables and Supabase resources used locally. Configure production OAuth redirects and Stripe webhook URLs where those features are enabled. The live version runs at [tryquartz.wiki](https://www.tryquartz.wiki).
 
 ## Limitations
 
@@ -121,8 +119,7 @@ Deploy the Next.js project with the same environment variables and Supabase reso
 - Fresh AI generations and audio incur provider costs.
 - The database and storage setup is required separately; a clone alone is not a fully provisioned instance.
 - Browser caching and anonymous limits are browser-local and can be cleared.
-- Current login and quota behavior is documented above; this README does not change it.
 
 ## Attribution and license
 
-No standalone license file is included. This README does not grant a new license.
+No license file is included.
